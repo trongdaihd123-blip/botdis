@@ -2,6 +2,8 @@ const { Client, GatewayIntentBits, EmbedBuilder, Routes, Partials } = require('d
 
 const sc = require('./soundcloud-api');
 const nct = require('./nhaccuatui-api');
+const troll = require('./troll');
+const aichat = require('./aichat');
 const axios = require('axios');
 const tuluyen = require('./tuluyen/index.cjs');
 const fs = require('fs');
@@ -366,6 +368,15 @@ client.on('messageCreate', async (message) => {
           `\`${prefix}soundcloud <tên>\` (alias: \`${prefix}music\`, \`${prefix}sc\`) — Tìm nhạc SoundCloud\n` +
           `\`${prefix}nhaccuatui <tên>\` (alias: \`${prefix}nct\`) — Tìm nhạc NhacCuaTui\n` +
           `Reply số 1-10 vào kết quả để tải voice message` },
+        { name: '🤖 AI/Chat', value:
+          `\`${prefix}ai <hỏi>\` (alias \`${prefix}gemini\`, \`${prefix}hoi\`) — Hỏi Paimon-Gemini\n` +
+          `\`${prefix}ds <hỏi>\` (alias \`${prefix}deepseek\`) — Hỏi DeepSeek\n` +
+          `\`${prefix}chat <nói gì đó>\` — Tám với Simsimi` },
+        { name: '😂 Troll (mỗi ngày reset)', value:
+          `\`${prefix}gay [@user]\` • \`${prefix}deptrai [@user]\` • \`${prefix}uytin [@user]\`\n` +
+          `\`${prefix}tay [@user]\` • \`${prefix}haihuoc [@user]\` • \`${prefix}danhphan [@user]\`\n` +
+          `\`${prefix}rip [@user]\` • \`${prefix}dam @user\` • \`${prefix}les @user\`\n` +
+          `Tag/reply ai thì check người đó, không thì tự check • QTV: \`<lệnh> set <số> @user\`` },
         { name: '🛡️ Quản trị', value:
           `\`${prefix}setup\` — Set đấng sáng thế (1 lần duy nhất)\n` +
           `\`${prefix}add qtv @user\` / \`${prefix}remove qtv @user\` — QTV cấp cao\n` +
@@ -402,6 +413,26 @@ client.on('messageCreate', async (message) => {
       process.exit(0);
     }, 30000);
     return;
+  }
+
+  // === TROLL (port tu bot2) ===
+  if (troll.isTrollCommand(cmd)) {
+    try {
+      const handled = await troll.handleTrollCommand(message, cmd, args, prefix, { isQtv: (id) => isQtv(id) });
+      if (handled) return;
+    } catch (e) {
+      console.error('[TROLL]', e.message);
+    }
+  }
+
+  // === AI/CHAT (port tu bot2) ===
+  if (aichat.isAiCommand(cmd)) {
+    try {
+      const handled = await aichat.handleAiCommand(message, cmd, args);
+      if (handled) return;
+    } catch (e) {
+      console.error('[AICHAT]', e.message);
+    }
   }
 
   // === TU TIEN (ported tu-luyen tu bot2) ===
