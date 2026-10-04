@@ -4,6 +4,7 @@ const sc = require('./soundcloud-api');
 const nct = require('./nhaccuatui-api');
 const troll = require('./troll');
 const aichat = require('./aichat');
+const aliasMod = require('./alias');
 const axios = require('axios');
 const tuluyen = require('./tuluyen/index.cjs');
 const fs = require('fs');
@@ -38,6 +39,18 @@ const searches = new Map();
 function isQtv(userId) {
   return data.qtv.includes(userId);
 }
+
+// Danh sach lenh goc (de validate ,alias add) — dong bo voi cac module + core
+const KNOWN_COMMANDS = [
+  'setup', 'set', 'add', 'remove', 'listadmin', 'list-qtv', 'admin',
+  'prefix', 'music', 'soundcloud', 'sc', 'nhaccuatui', 'nct',
+  'cmd', 'help', 'commands', 'del', 'restart', 'alias',
+  'tu', 'tu-luyen', 'tl', 'dp', 'tt', 'thong-tin', 'bxh', 'bang-xep-hang',
+  'shop', 'pk', 'mua', 'dung', 'su-kien', 'tham-hiem', 'explore',
+  'be-quan', 'bq', 'seclude',
+  ...troll.COMMANDS,
+  ...aichat.COMMANDS,
+];
 
 function parseCommand(content, prefix) {
   if (!content.startsWith(prefix)) return null;
@@ -172,7 +185,24 @@ client.on('messageCreate', async (message) => {
   const parsed = parseCommand(message.content, prefix);
   if (!parsed) return;
 
-  const { cmd, args } = parsed;
+  let { cmd } = parsed;
+  const args = parsed.args;
+
+  // Alias tuy bien (,alias add/del/list) — giai truoc khi dispatch
+  if (aliasMod.isAliasCommand(cmd)) {
+    try {
+      const handled = await aliasMod.handleAliasCommand(message, args, prefix, {
+        isQtv: (id) => isQtv(id),
+        knownCommands: KNOWN_COMMANDS,
+      });
+      if (handled) return;
+    } catch (e) {
+      console.error('[ALIAS]', e.message);
+    }
+    return;
+  }
+  const aliased = aliasMod.resolveAlias(cmd);
+  if (aliased) cmd = aliased;
 
   if (!cmd) {
     return message.reply(`nếu mày thắc mắc tao có những lệnh gì thì hãy ${prefix}help`);
@@ -382,6 +412,7 @@ client.on('messageCreate', async (message) => {
         { name: '🛡️ Quản trị', value:
           `\`${prefix}setup\` — Set đấng sáng thế (1 lần duy nhất)\n` +
           `\`${prefix}add qtv @user\` / \`${prefix}remove qtv @user\` — QTV cấp cao\n` +
+          `\`${prefix}alias add <tên> <lệnh>\` / \`${prefix}alias del <tên>\` / \`${prefix}alias list\` — Alias riêng\n` +
           `\`${prefix}listadmin\` — DS admin • \`${prefix}restart\` • \`${prefix}prefix <new>\`\n` +
           `**QTV:** \`${prefix}tl set +stt @user <số>\` • \`${prefix}tl update <nội dung>\` • \`${prefix}tl check buff|bank @user\`\n` +
           `**Đấng sáng thế:** thêm \`${prefix}tl banacc/unban @user\` • \`${prefix}tl thap reset\`` },
