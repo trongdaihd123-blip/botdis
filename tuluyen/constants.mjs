@@ -755,6 +755,7 @@ const POTIONS = [
 const CONGPHA = [
   { id: "34", name: "Bí Kiếp Cửu Chuyền Thể", emoji: "📜", price: 5000, maxStamina: 600, desc: "Tăng giới hạn Thể Lực lên 600 (vĩnh viễn)." },
   { id: "213", name: "Bách Mạch Thông Thể", emoji: "🌊", price: 500000000, maxStamina: 1600, desc: "Yêu cầu học Bí Kiếp Cửu Chuyền Thể (id 34). Giới hạn Thể Lực +1000, đạt 1600 (vĩnh viễn)." },
+  { id: "200", name: "Bí Kíp Cải Tử Hoàn Sinh", emoji: "💫", price: 10000000, learnFailRate: 70, reviveChance: 3, reviveHpPct: 100, desc: "Bí kíp nghịch thiên cải tử hoàn sinh. Khi học (.tl use 200) có 70% thất bại (mất sách, phải mua lại). Khi lĩnh ngộ thành công: PK khi bị đánh chết có 3% hồi sinh với 100% máu (1 lần/trận)." },
 ];
 
 const SPECIAL_ITEMS = [
@@ -770,6 +771,7 @@ const PHAP_BAO = [
   { id: "pb_pangu_seal",   name: "Bàn Cổ Thần Ấn",    emoji: "🏺", atk: 20000000000000000, def: 8000000000000000, hp: 2000000000000000000, expBonus: 0, bossScale: 100, price: 25000000000, tier: "mythical", desc: "Thần ấn của Bàn Cổ, trấn áp chư thiên. Kháng 100% Boss Scaling. (TỐI THƯỢNG)" },
   { id: "pb_taiji_chart",  name: "Thái Cực Đồ",      emoji: "☯️", atk: 0,          def: 5000000000000000, hp: 0,           expBonus: 0,    reflect: 50,    price: 15000000000, tier: "mythical", desc: "Bản đồ thái cực, chuyển hóa âm dương. Phản 50% sát thương. (PHÒNG NGỰ)" },
   { id: "pb_donghuang_bell", name: "Đông Hoàng Chuông", emoji: "🔔", atk: 0,       def: 0,          hp: 500000000000000000, expBonus: 20, price: 15000000000, tier: "mythical", desc: "Tiếng chuông vang vọng khắp thái cổ. (KHÍ VẬN — EXP +20%, HP vô song)" },
+  { id: "pb_hondon_tangthienquan", name: "Hỗn Độn Táng Thiên Quan", emoji: "⚰️", atk: 0, def: 0, hp: 250000000000000000000, expBonus: 0, reflect: 25, trueDmg: 70, dodge: 10, dmgReduction: 10, price: 250000000000, tier: "mythical", vongHon: true, desc: "Quan tài chôn cả thiên đạo. Phản 25%, ST Chuẩn 70%, Né 10%, HP +250Qi, Giảm 10% ST. VONG HỒN: khi đòn tiếp theo của địch là đòn kết liễu, hóa vong hồn né 100% đòn đó (1 lần/trận PK)." },
 ];
 
 // ── DANH HIỆU ──────────────────────────────────────────────
@@ -812,7 +814,7 @@ function checkTop3Title(data) {
 
 // ── VẬT PHẨM ĐẶC BIỆT (chỉ nhận qua lệnh admin .tl buff item) ──
 const TOKEN_ITEMS = [
-  { id: "an_tu_vi_lenh",   name: "Ẩn Tu Vi Lệnh",  emoji: "🌫️", desc: "Khi có trong túi, cảnh giới của bạn bị ẩn khỏi mọi bảng xếp hạng (.tl top). Dù tu vi cao đến đâu cũng không hiển thị." },
+  { id: "an_tu_vi_lenh",   name: "Ẩn Tu Vi Lệnh",  emoji: "🌫️", desc: "Khi có trong túi, cảnh giới của anh bị ẩn khỏi mọi bảng xếp hạng (.tl top). Dù tu vi cao đến đâu cũng không hiển thị." },
   { id: "hien_nguyen_hinh", name: "Hiện Nguyên Hình", emoji: "👁️", desc: "Tiêu hao Ẩn Tu Vi Lệnh trong túi và thay thế bằng lá bùa này — hiện lại tu vi trên bảng xếp hạng như bình thường." },
   { id: "sang_the_lenh",   name: "Sáng Thế Lệnh",   emoji: "🔱", desc: "Vật phẩm thiêng liêng chỉ Đấng Sáng Thế mới có thể ban cho. Khi mang trong túi, mở ra quyền năng quản trị cấp cao — có thể sử dụng các lệnh admin tu luyện." },
 ];
@@ -1247,6 +1249,7 @@ function calcStats(player) {
       if (b.type === "spd_pct") buffSpd += b.value;
       else if (b.type === "hp_max_boost_pct") buffHp += b.value;
       else if (b.type === "exp_boost_pct" || b.type === "secret_exp_boost_pct") buffExp += b.value;
+      else if (b.type === "exp_multiplier") buffExp += (b.value >= 10 ? b.value : (b.value - 1) * 100);
       else if (b.type === "atk_pct") buffAtk += b.value;
       else if (b.type === "def_pct") buffDef += b.value;
       else if (b.type === "lifesteal_pct") buffLife += b.value;
@@ -1284,7 +1287,7 @@ function calcStats(player) {
     }
   }
 
-  let pbAtk = 0, pbDef = 0, pbHp = 0, pbExpBonus = 0, pbBossScale = 0, pbReflect = 0;
+  let pbAtk = 0, pbDef = 0, pbHp = 0, pbExpBonus = 0, pbBossScale = 0, pbReflect = 0, pbTrueDmg = 0, pbDodge = 0, pbDmgRed = 0;
   if (player.equippedPhapBao) {
     const pb = PHAP_BAO.find(p => p.id === player.equippedPhapBao);
     if (pb) {
@@ -1292,6 +1295,9 @@ function calcStats(player) {
       pbAtk = Math.floor((pb.atk || 0) * uP); pbDef = Math.floor((pb.def || 0) * uP); pbHp = Math.floor((pb.hp || 0) * uP);
       pbExpBonus = pb.expBonus || 0; pbBossScale = pb.bossScale || 0;
       pbReflect = pb.reflect || 0;
+      pbTrueDmg = pb.trueDmg || 0;
+      pbDodge = pb.dodge || 0;
+      pbDmgRed = pb.dmgReduction || 0;
     }
   }
 
@@ -1306,16 +1312,16 @@ function calcStats(player) {
     }
   }
 
-  const atk = Math.floor((baseAtk + wAtk + aAtk + pbAtk) * (1 + (atkBonus + titleAtkPct) / 100) * (1 + buffAtk / 100) * titleAtkMult);
-  const hp = Math.floor((baseHp + wHp + aHp + pbHp) * (1 + (hpBonus + titleHpPct) / 100) * (1 + buffHp / 100));
-  const spd = Math.max(1, Math.floor((baseSpd + wSpd + aSpd) * (1 + spdBonus / 100) * (1 + buffSpd / 100)));
-  const def = Math.floor((baseDef + wDef + aDef + pbDef) * (1 + defBonus / 100) * (1 + buffDef / 100));
+  const atk = Math.floor((baseAtk + wAtk + aAtk + pbAtk) * (1 + (atkBonus + titleAtkPct) / 100) * (1 + buffAtk / 100) * titleAtkMult) + Math.floor(player.luanhoiReleased?.atk || 0);
+  const hp = Math.floor((baseHp + wHp + aHp + pbHp) * (1 + (hpBonus + titleHpPct) / 100) * (1 + buffHp / 100)) + Math.floor(player.luanhoiReleased?.hp || 0);
+  const spd = Math.max(1, Math.floor((baseSpd + wSpd + aSpd) * (1 + spdBonus / 100) * (1 + buffSpd / 100)) + Math.floor(player.luanhoiReleased?.spd || 0));
+  const def = Math.floor((baseDef + wDef + aDef + pbDef) * (1 + defBonus / 100) * (1 + buffDef / 100)) + Math.floor(player.luanhoiReleased?.def || 0);
   const crit = Math.max(0, baseCrit + wCrit + aCrit + (theChat.crit || 0) + (huyetMach.crit || 0));
   const lifesteal = wLifesteal + (theChat.lifesteal || 0) + (huyetMach.lifesteal || 0) + aLife + buffLife;
   const critResist = (theChat.critResist || 0) + (huyetMach.critResist || 0);
-  const dodge = (theChat.dodge || 0) + (huyetMach.dodge || 0) + aDodge;
-  const trueDmg = (theChat.trueDmg || 0) + (huyetMach.trueDmg || 0) + aTrueDmg + wTrueDmg;
-  const dmgReduction = Math.min((theChat.dmgReduction || 0) + (huyetMach.dmgReduction || 0) + aDmgRed + wDmgRed + Math.min(phithang * 10, 90), 90);
+  const dodge = (theChat.dodge || 0) + (huyetMach.dodge || 0) + aDodge + pbDodge;
+  const trueDmg = (theChat.trueDmg || 0) + (huyetMach.trueDmg || 0) + aTrueDmg + wTrueDmg + pbTrueDmg;
+  const dmgReduction = Math.min((theChat.dmgReduction || 0) + (huyetMach.dmgReduction || 0) + aDmgRed + wDmgRed + pbDmgRed + Math.min(phithang * 10, 90), 90);
   const armorPen = (theChat.armorPen || 0) + (huyetMach.armorPen || 0) + aArmorPen;
   const luck = baseLuck + aLuck;
   const expBonus = (theChat.expBonus || 0) + (huyetMach.expBonus || 0) + buffExp + aExpBonus + pbExpBonus;

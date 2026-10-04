@@ -84,6 +84,18 @@ function transformMain(raw) {
     );
     if (raw !== before) shimNames.add("isSangThe");
   }
+  // Discord: qtv/sangThe (data.json) duoc coi la Dang Sang The.
+  // Quy tac nay dat truoc stripZaloImports de mustReplace thay duoc text goc.
+  {
+    const before = raw;
+    raw = mustReplace(
+      raw,
+      "function isDangSangThe(userId) {\n  return DANG_SANG_THE_IDS.includes(String(userId));\n}",
+      "function isDangSangThe(userId) {\n  return DANG_SANG_THE_IDS.includes(String(userId)) || isSangThe(userId); // +Discord dang-sang-the\n}",
+      "isDangSangThe chap nhan isSangThe (Discord)"
+    );
+    if (raw !== before) shimNames.add("isSangThe");
+  }
   let out = raw;
 
   out = stripZaloImports(out);

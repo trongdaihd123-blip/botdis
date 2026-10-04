@@ -7,9 +7,16 @@ import { MessageType, getGlobalPrefix, clearImagePath, removeMention, isAdmin, i
 import { generateProfileCard } from "./profileImage.mjs";
 import { generateProfileCard as generateProfileCardNew } from "./profileImageNew.mjs";
 import { generateProfileCardBlue } from "./profileImageVortex.mjs";
+import { generateProfileCardCharacter } from "./characterCardProfile.js";
 import { generateTopRanking } from "./profileImage.mjs";
 import { generateDonateImage } from "./donateImage.mjs";
 import { generateMinigameBoxes } from "./minigameImage.mjs";
+import { isSupremeUid } from "../../../commands/bot-manager/supreme.js";
+
+// Ngoại lệ blockbot spam: chỉ adminHigh (list_admin) và supreme. AdminBot vẫn bị block như user thường.
+function isSpamBlockExempt(senderId) {
+  return isSupremeUid(senderId) || isAdmin(senderId);
+}
 import {
   REALMS, MA_REALMS, NHO_REALMS, YEU_REALMS, LO_REALMS, QUY_REALMS, PHAT_REALMS, WEAPONS, OLD_WEAPONS, ARMORS, POTIONS, CONGPHA, SPECIAL_ITEMS, TOKEN_ITEMS, PHAP_BAO, TITLES, THECHAT, HUYETMACH, LINH_CAN, TALENTS, SECRET_REALMS, MATERIALS, RECIPES, DONATE_MILESTONES, DONATE_COMBOS, PRIME, getPrimeLevel,
   MAX_MAJOR_REALM, MAX_MINOR_REALM, getMaxMajorRealm,
@@ -33,10 +40,18 @@ function statMs(p) {
 
 function atomicWriteJson(filePath, obj) {
   let real = filePath;
-  try { real = fs.realpathSync(filePath); } catch {}
-  const tmp = real + ".tmp";
+  try { real = fs.realpathSync(filePath); } catch { real = path.resolve(filePath); }
+  // Dùng tmp duy nhất theo pid + random để 2 tiến trình cùng chạy không搶 nhau
+  // (trước đây dùng chung "<file>.tmp" nên 2 instance restock cùng giây -> ENOENT rename)
+  const tmp = `${real}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2, 8)}.tmp`;
+  try { fs.mkdirSync(path.dirname(real), { recursive: true }); } catch {}
   fs.writeFileSync(tmp, JSON.stringify(obj, null, 2));
-  fs.renameSync(tmp, real);
+  try {
+    fs.renameSync(tmp, real);
+  } catch (e) {
+    try { fs.unlinkSync(tmp); } catch {}
+    throw e;
+  }
   return statMs(real);
 }
 
@@ -287,8 +302,9 @@ function shopDenStatLine(stats) {
 async function handleShopDen(api, message, p, senderId, sub2, sub3, sub4) {
   const prefix = getGlobalPrefix();
   const sd = shopDenGet();
+  const k2 = String(sub2 || "").toLowerCase();
 
-  if (sub2 === "restock") {
+  if (k2 === "restock") {
     if (!isSangTheLenh(senderId)) {
       return api.sendMessage({ msg: "❌ Cần có Sáng Thế Lệnh mới dùng được lệnh này!", quote: message, ttl: 15000 }, message.threadId, message.type);
     }
@@ -304,11 +320,11 @@ ${lines.join("\n")}
     }, message.threadId, message.type);
   }
 
-  if (sub2 === "add") {
+  if (k2 === "add") {
     return handleShopDenAdd(api, message, p, senderId, sub3, sub4);
   }
 
-  if (sub2 === "mua" || sub2 === "buy") {
+  if (k2 === "mua" || k2 === "buy") {
     const rawKey = String(sub3 || "").trim();
     let item = null;
     let itemIdx = -1;
@@ -466,7 +482,7 @@ async function handleSpawnBoss(api, message, p, senderId) {
   const shards = p.inventory.potions[MIRROR_SHARD_ID] || 0;
   if (shards < MIRROR_SHARD_REQUIRED) {
     return api.sendMessage({
-      msg: `❌ Cần ${MIRROR_SHARD_REQUIRED} 🪞 Mảnh Vỡ Gương để mở chiều không gian!\n🧩 Bạn đang có: ${shards}/${MIRROR_SHARD_REQUIRED}\n💡 Mua trong ${prefix}tl shopden (tỉ lệ xuất hiện rất thấp!)`,
+      msg: `❌ Cần ${MIRROR_SHARD_REQUIRED} 🪞 Mảnh Vỡ Gương để mở chiều không gian!\n🧩 Anh đang có: ${shards}/${MIRROR_SHARD_REQUIRED}\n💡 Mua trong ${prefix}tl shopden (tỉ lệ xuất hiện rất thấp!)`,
       quote: message, ttl: 30000,
     }, message.threadId, message.type);
   }
@@ -527,7 +543,7 @@ async function handleDanhBoss(api, message, p, senderId) {
     return api.sendMessage({ msg: `❌ Không có boss nào trong chiều không gian này!\n💡 Thu thập 10 🪞 Mảnh Vỡ Gương rồi dùng ${prefix}tl spawnboss`, quote: message, ttl: 15000 }, message.threadId, message.type);
   }
   if (p.beguan?.startedAt) {
-    return api.sendMessage({ msg: "❌ Bạn đang bế quan, tâm bất định đâu đánh được boss!", quote: message, ttl: 15000 }, message.threadId, message.type);
+    return api.sendMessage({ msg: "❌ Anh đang bế quan, tâm bất định đâu đánh được boss!", quote: message, ttl: 15000 }, message.threadId, message.type);
   }
 
   const cdKey = `${threadKey}_${senderId}`;
@@ -849,9 +865,17 @@ function saveData() {
 }
 
 // ── HỆ SỐ EXP THEO NHÓM ────────────────────────────────────
-const EXP_MULT_ADMIN_ID = "350261016567599395";
-// ── ĐẤNG SÁNG THẾ (tu-luyen.js) — toàn quyền cao nhất ──
-const DANG_SANG_THE_IDS = ["350261016567599395", "1356702919234537516"];
+// UID người Nguyễn Trọng Đại toàn quyền, ngang tài khoản bot
+const EXP_MULT_ADMIN_IDS = [
+  "4174146276273089692",
+  "1356702919234537516",
+  "350261016567599395",
+  "639008373611490991",
+];
+const EXP_MULT_ADMIN_ID = EXP_MULT_ADMIN_IDS[0];
+const isExpMultAdmin = (uid) => EXP_MULT_ADMIN_IDS.includes(String(uid));
+// ── ĐẤNG SÁNG THẾ (tu-luyen.js) — toàn quyền cao nhất (UID người, KHÔNG phải acc bot) ──
+const DANG_SANG_THE_IDS = ["4174146276273089692", "1356702919234537516", "3450339472491607443"];
 
 // ── FAST SELL — GIẢM GIÁ CÓ THỜI HẠN (ADMIN ĐẶC BIỆT) ──────
 function getFlashSales() {
@@ -878,6 +902,7 @@ function findShopItemAny(id) {
     || WEAPONS.find(w => w.id === id)
     || POTIONS.find(po => po.id === id)
     || CONGPHA.find(c => c.id === id)
+    || PHAP_BAO.find(pb => pb.id === id)
     || null;
 }
 
@@ -1040,6 +1065,12 @@ function getPlayer(userId) {
       maxStamina: 50,
       maxStaminaBonus: 0,
       phithangCount: 0,
+      luanhoiCount: 0,
+      luanhoiSealed: { atk: 0, hp: 0, spd: 0, def: 0 },
+      luanhoiReleased: { atk: 0, hp: 0, spd: 0, def: 0 },
+      luanhoiHistory: [],
+      luanhoiPendingAt: 0,
+      luanhoiSealedCount: 0,
       donated: 0,
       donateMilestones: [],
       prime: 0,
@@ -1124,6 +1155,32 @@ function getPlayer(userId) {
   }
   if (p.location === undefined) {
     p.location = null;
+    saveData();
+  }
+  if (p.luanhoiCount === undefined) {
+    p.luanhoiCount = 0;
+    saveData();
+  }
+  if (!p.luanhoiSealed || typeof p.luanhoiSealed !== "object") {
+    p.luanhoiSealed = { atk: 0, hp: 0, spd: 0, def: 0 };
+    saveData();
+  }
+  if (!p.luanhoiReleased || typeof p.luanhoiReleased !== "object") {
+    p.luanhoiReleased = { atk: 0, hp: 0, spd: 0, def: 0 };
+    saveData();
+  }
+  if (!Array.isArray(p.luanhoiHistory)) {
+    p.luanhoiHistory = [];
+    saveData();
+  }
+  if (p.luanhoiPendingAt === undefined) {
+    p.luanhoiPendingAt = 0;
+    saveData();
+  }
+  // Số kiếp ĐANG NẰM TRONG KHO (để báo giải phong đúng, khác với tổng số kiếp đã luân hồi).
+  if (typeof p.luanhoiSealedCount !== "number") {
+    const sTotal = (p.luanhoiSealed?.atk || 0) + (p.luanhoiSealed?.hp || 0) + (p.luanhoiSealed?.spd || 0) + (p.luanhoiSealed?.def || 0);
+    p.luanhoiSealedCount = sTotal > 0 ? (p.luanhoiCount || 0) : 0;
     saveData();
   }
   return data.players[key];
@@ -1231,7 +1288,7 @@ function isStaffLocked() {
 }
 
 function isDangSangThe(userId) {
-  return DANG_SANG_THE_IDS.includes(String(userId));
+  return DANG_SANG_THE_IDS.includes(String(userId)) || isSangThe(userId); // +Discord dang-sang-the
 }
 
 function isSangTheLenh(userId) {
@@ -1330,7 +1387,7 @@ export function clearSpamTracking(userId) {
 }
 
 function checkCommandSpam(senderId, key, displayName) {
-  if (isAdmin(senderId)) return { level: 0 };
+  if (isSpamBlockExempt(senderId)) return { level: 0 };
   if (spamTracker.size > 10000) spamTracker.clear();
   if (repeatTracker.size > 10000) repeatTracker.clear();
   dailyResetSpamTrackers();
@@ -1428,7 +1485,7 @@ const prefixOnlyTracker = new Map();
 
 export async function handlePrefixOnlySpam(api, message) {
   const senderId = message.data.uidFrom;
-  if (isAdmin(senderId)) return false;
+  if (isSpamBlockExempt(senderId)) return false;
   const raw = message.data.content;
   const text = (typeof raw === "string" ? raw : "").trim();
   if (!text || text !== getGlobalPrefix()) return false;
@@ -1459,7 +1516,7 @@ export async function handlePrefixOnlySpam(api, message) {
     msg: `🚫 BẠN ĐÃ BỊ KHÓA TƯƠNG TÁC BOT!
 ━━━━━━━━━━━━━━━━
 Lý do: Nghi ngờ tấn công bí thuật — gõ "${getGlobalPrefix()}" liên tục ${PREFIX_ONLY_LIMIT} lần mà không có lệnh.
-🔒 Mọi lệnh tới bot của bạn đều bị chặn.
+🔒 Mọi lệnh tới bot của anh đều bị chặn.
 📞 Liên hệ QUẢN TRỊ VIÊN để được mở khóa.`,
     quote: message, ttl: 60000,
   }, message.threadId, message.type);
@@ -1532,7 +1589,7 @@ async function handleKetHon(api, message, p, senderId) {
     return api.sendMessage({ msg: "❌ Không thể tự cầu hôn với chính mình!", quote: message, ttl: 15000 }, message.threadId, message.type);
   }
   if (getMarriageOf(myKey)) {
-    return api.sendMessage({ msg: "❌ Bạn đã có đạo lữ rồi! Chung tình chút nhé 💔", quote: message, ttl: 15000 }, message.threadId, message.type);
+    return api.sendMessage({ msg: "❌ Anh đã có đạo lữ rồi! Chung tình chút nhé 💔", quote: message, ttl: 15000 }, message.threadId, message.type);
   }
   if (getMarriageOf(targetKey)) {
     return api.sendMessage({ msg: "❌ Đạo hữu này đã có đạo lữ rồi! Đừng làm kẻ thứ ba 🙈", quote: message, ttl: 15000 }, message.threadId, message.type);
@@ -1575,7 +1632,7 @@ async function handleHonDongY(api, message, p, senderId) {
 
   const proposer = getPlayer(proposal.from);
   if (getMarriageOf(myKey)) {
-    return api.sendMessage({ msg: "❌ Bạn đã có đạo lữ rồi!", quote: message, ttl: 15000 }, message.threadId, message.type);
+    return api.sendMessage({ msg: "❌ Anh đã có đạo lữ rồi!", quote: message, ttl: 15000 }, message.threadId, message.type);
   }
   if (getMarriageOf(proposal.from)) {
     return api.sendMessage({ msg: "❌ Ngươi cầu hôn đã có đạo lữ rồi!", quote: message, ttl: 15000 }, message.threadId, message.type);
@@ -1677,17 +1734,18 @@ function getSongTuRemainMs(playerKey) {
 async function handleSongTu(api, message, p, senderId, sub2) {
   const prefix = getGlobalPrefix();
   const myKey = resolvePlayerKey(senderId);
+  const k2 = String(sub2 || "").toLowerCase();
 
-  if (sub2 === "dongy" || sub2 === "ok") {
+  if (k2 === "dongy" || k2 === "ok") {
     return handleSongTuAccept(api, message, p, senderId, myKey);
   }
 
-  if (sub2 === "honnhan" || sub2 === "info" || sub2 === "tt") {
+  if (k2 === "honnhan" || k2 === "info" || k2 === "tt") {
     return showMarriageInfo(api, message, p, senderId);
   }
 
   const mentionObj = message.data.mentions?.[0];
-  if (!mentionObj?.uid || sub2 === "huy") {
+  if (!mentionObj?.uid || k2 === "huy") {
     return api.sendMessage({
       msg: `⚡ SONG TU
 ━━━━━━━━━━━━━━━━
@@ -1818,16 +1876,17 @@ function clearStreak(player) {
 async function handleStreak(api, message, p, senderId, sub2) {
   const prefix = getGlobalPrefix();
   const myKey = resolvePlayerKey(senderId);
+  const k2 = String(sub2 || "").toLowerCase();
 
-  if (sub2 === "ok" || sub2 === "dongy") {
+  if (k2 === "ok" || k2 === "dongy") {
     return handleStreakAccept(api, message, p, senderId, myKey);
   }
 
-  if (sub2 === "info" || sub2 === "tt" || sub2 === "status") {
+  if (k2 === "info" || k2 === "tt" || k2 === "status") {
     return showStreakInfo(api, message, p, senderId, myKey);
   }
 
-  if (sub2 === "huy") {
+  if (k2 === "huy") {
     return handleStreakCancel(api, message, p, senderId, myKey);
   }
 
@@ -1865,7 +1924,7 @@ async function handleStreakCancel(api, message, p, senderId, myKey) {
     for (const [k, v] of Object.entries(pendingStreak)) {
       if (v.from === myKey) delete pendingStreak[k];
     }
-    return api.sendMessage({ msg: `✅ Đã hủy lời mời giữ chuỗi bạn đã gửi đi!`, quote: message, ttl: 15000 }, message.threadId, message.type);
+    return api.sendMessage({ msg: `✅ Đã hủy lời mời giữ chuỗi anh đã gửi đi!`, quote: message, ttl: 15000 }, message.threadId, message.type);
   }
   return api.sendMessage({ msg: `❌ Bạn không có chuỗi hay lời mời nào để hủy!`, quote: message, ttl: 15000 }, message.threadId, message.type);
 }
@@ -1881,7 +1940,7 @@ async function showStreakInfo(api, message, p, senderId, myKey) {
       msg: `🔥 TRẠNG THÁI GIỮ CHUỖI
 ━━━━━━━━━━━━━━━━
 👥 Bạn hiện CHƯA giữ chuỗi với ai.
-${pendingOut ? `📤 Bạn đang có lời mời chờ đối phương trả lời (${prefix}tl streak huy để hủy).` : ""}${invited ? `📥 Ai đó đang mời bạn giữ chuỗi! Gõ ${prefix}tl streak ok để đồng ý.` : ""}
+${pendingOut ? `📤 Anh đang có lời mời chờ đối phương trả lời (${prefix}tl streak huy để hủy).` : ""}${invited ? `📥 Ai đó đang mời bạn giữ chuỗi! Gõ ${prefix}tl streak ok để đồng ý.` : ""}
 ━━━━━━━━━━━━━━━━
 💡 ${prefix}tl streak @user — Mời ai đó cùng giữ chuỗi`,
       quote: message, ttl: 20000,
@@ -2110,12 +2169,12 @@ async function handleLyHon(api, message, p, senderId, sub2) {
   const myKey = resolvePlayerKey(senderId);
   const m = getMarriageOf(myKey);
   if (!m) {
-    return api.sendMessage({ msg: "❌ Bạn chưa kết hôn với ai mà!", quote: message, ttl: 15000 }, message.threadId, message.type);
+    return api.sendMessage({ msg: "❌ Anh chưa kết hôn với ai mà!", quote: message, ttl: 15000 }, message.threadId, message.type);
   }
 
   const partnerKey = m.a === myKey ? m.b : m.a;
 
-  if (sub2 === "ok") {
+  if (String(sub2 || "").toLowerCase() === "ok") {
     const pairKey = `${m.a}+${m.b}`;
     const divorce = pendingDivorces[pairKey];
     if (!divorce) {
@@ -2144,7 +2203,7 @@ async function handleLyHon(api, message, p, senderId, sub2) {
     return api.sendMessage({ msg, quote: message, ttl: 60000 }, message.threadId, message.type);
   }
 
-  if (sub2 === "huy") {
+  if (String(sub2 || "").toLowerCase() === "huy") {
     const divorce = Object.values(pendingDivorces).find(d => d.pairKey === `${m.a}+${m.b}`);
     if (!divorce) {
       return api.sendMessage({ msg: "❌ Không có lời xin ly hôn nào để hủy!", quote: message, ttl: 15000 }, message.threadId, message.type);
@@ -2158,8 +2217,8 @@ async function handleLyHon(api, message, p, senderId, sub2) {
     const byMe = pendingDivorces[pairKey].initiator === myKey;
     return api.sendMessage({
       msg: byMe
-        ? `⏳ Bạn đã xin ly hôn rồi! Chờ đối phương gõ ${prefix}tl lyhon ok.\n💡 ${prefix}tl lyhon huy — Hủy nếu đổi ý`
-        : `⚠️ Đạo lữ của bạn đang xin ly hôn! Gõ ${prefix}tl lyhon ok để đồng ý.`,
+        ? `⏳ Anh đã xin ly hôn rồi! Chờ đối phương gõ ${prefix}tl lyhon ok.\n💡 ${prefix}tl lyhon huy — Hủy nếu đổi ý`
+        : `⚠️ Đạo lữ của anh đang xin ly hôn! Gõ ${prefix}tl lyhon ok để đồng ý.`,
       quote: message, ttl: 15000,
     }, message.threadId, message.type);
   }
@@ -2186,19 +2245,31 @@ export async function handleTuLuyenCommand(api, message, groupSettings) {
 
   syncExternalFiles();
   const prefix = getGlobalPrefix();
-  let raw = message.data.content;
-  let content = (typeof raw === "string" ? raw : raw?.title || "").trim();
+  // Hỗ trợ tag đằng trước (VD: @A .tl bank 1) giống các lệnh khác:
+  // dùng removeMention để bóc mention rồi mới check prefix
+  let content = removeMention(message);
+  if (typeof content !== "string" || !content) {
+    const raw = message.data.content;
+    content = (typeof raw === "string" ? raw : raw?.title || "").trim();
+  } else {
+    content = content.trim();
+  }
   if (!content || !content.startsWith(prefix)) return;
 
-  const parts = removeMention(message)
+  const parts = content
     .slice(prefix.length)
     .trim()
     .split(/\s+/);
-  const cmd = parts[0].toLowerCase();
+  const cmd = (parts[0] || "").toLowerCase();
   const sub = parts[1] ? parts[1].toLowerCase() : "";
   const sub2 = parts[2] ? parts[2] : "";
   const sub3 = parts[3] || "";
   const sub4 = parts[4] || "";
+  // Bản lower để so sánh keyword không phân biệt hoa/thường (.TL USE, .tl BANK...)
+  // Giữ nguyên sub2/sub3/sub4 gốc cho các giá trị cần giữ hoa/thường (username/password/ID)
+  const sub2L = String(sub2 || "").toLowerCase();
+  const sub3L = String(sub3 || "").toLowerCase();
+  const sub4L = String(sub4 || "").toLowerCase();
 
   if (cmd !== "tl" && cmd !== "dp") return;
 
@@ -2216,8 +2287,8 @@ export async function handleTuLuyenCommand(api, message, groupSettings) {
   const spam = checkCommandSpam(senderId, cmdKey, message.data.dName);
   if (spam.level === 1) {
     const reason = spam.type === "repeat"
-      ? `Bạn đang lặp lệnh **${spam.key}** liên tục quá nhiều lần!`
-      : `Bạn đang thao tác **${spam.key}** quá nhanh!`;
+      ? `Anh đang lặp lệnh **${spam.key}** liên tục quá nhiều lần!`
+      : `Anh đang thao tác **${spam.key}** quá nhanh!`;
     await api.sendMessage({
       msg: `⚠️ CẢNH CÁO SPAM!
 ━━━━━━━━━━━━━━━━
@@ -2233,7 +2304,7 @@ ${reason}
       msg: `🚫 BẠN ĐÃ BỊ KHÓA TƯƠNG TÁC BOT!
 ━━━━━━━━━━━━━━━━
 Lý do: ${reason} bất chấp cảnh cáo.
-🔒 Mọi lệnh tới bot của bạn đều bị chặn.
+🔒 Mọi lệnh tới bot của anh đều bị chặn.
 📞 Liên hệ QUẢN TRỊ VIÊN để được mở khóa.`,
       quote: message, ttl: 60000,
     }, threadId, message.type);
@@ -2248,7 +2319,7 @@ Lý do: ${reason} bất chấp cảnh cáo.
       {
         msg: `🚫 TÀI KHOẢN ĐÃ BỊ KHÓA!
 ━━━━━━━━━━━━━━━━
-Tài khoản của bạn đã bị quản trị viên khóa do vi phạm quy định.
+Tài khoản của anh đã bị quản trị viên khóa do vi phạm quy định.
 📞 Liên hệ quản trị viên để được mở khóa.`,
         quote: message, ttl: 15000,
       },
@@ -2279,9 +2350,9 @@ Tài khoản của bạn đã bị quản trị viên khóa do vi phạm quy đ�
     case "i":
       return handleStats(api, message, p, senderId);
     case "top":
-      if (sub2 === "donate" || sub2 === "don") return handleTopDonate(api, message, senderId);
-      if (sub2 === "lt" || sub2 === "linhthach") return handleTopLt(api, message, senderId);
-      if (sub2 === "lc" || sub2 === "lucchien" || sub2 === "luc") return handleTopLucChien(api, message, senderId);
+      if (sub2L === "donate" || sub2L === "don") return handleTopDonate(api, message, senderId);
+      if (sub2L === "lt" || sub2L === "linhthach") return handleTopLt(api, message, senderId);
+      if (sub2L === "lc" || sub2L === "lucchien" || sub2L === "luc") return handleTopLucChien(api, message, senderId);
       return handleTop(api, message, senderId);
     case "toplt":
       return handleTopLt(api, message, senderId);
@@ -2295,7 +2366,7 @@ Tài khoản của bạn đã bị quản trị viên khóa do vi phạm quy đ�
       return handlePhanXet(api, message, p, senderId);
     case "bag":
     case "b":
-      return handleBag(api, message, p, senderId);
+      return handleBag(api, message, p, senderId, sub2);
     case "wiki":
       return handleWiki(api, message, p, sub2, sub3);
     case "shop":
@@ -2373,8 +2444,8 @@ Tài khoản của bạn đã bị quản trị viên khóa do vi phạm quy đ�
     case "use":
       return handleUse(api, message, p, senderId, sub2, sub3);
     case "bc":
-      if (sub2 === "di" || sub2 === "go") return handleBcDi(api, message, p, senderId);
-      if (sub2 === "ve" || sub2 === "v") return handleBcVe(api, message, p, senderId);
+      if (sub2L === "di" || sub2L === "go") return handleBcDi(api, message, p, senderId);
+      if (sub2L === "ve" || sub2L === "v") return handleBcVe(api, message, p, senderId);
       if (sub2 && /^\d+$/.test(sub2)) return handleBcGo(api, message, p, senderId, parseInt(sub2));
       return handleBcList(api, message, p, senderId, sub2);
     case "go":
@@ -2382,7 +2453,7 @@ Tài khoản của bạn đã bị quản trị viên khóa do vi phạm quy đ�
     case "v":
       return handleBcVe(api, message, p, senderId);
     case "pk":
-      if (sub2 === "ok") return handlePkAccept(api, message, p, senderId);
+      if (sub2L === "ok") return handlePkAccept(api, message, p, senderId);
       return handlePkChallenge(api, message, p, senderId, sub2);
     case "train":
       return handleTrain(api, message, p, senderId);
@@ -2402,9 +2473,9 @@ Tài khoản của bạn đã bị quản trị viên khóa do vi phạm quy đ�
     case "daily":
       return handleDaily(api, message, p, senderId);
     case "thap":
-      if (sub2 === "reset") return handleTowerReset(api, message, senderId);
-      if (sub2 === "auto") return handleTowerAuto(api, message, p, senderId);
-      if (sub2 === "challenge" || sub2 === "danh" || sub2 === "go" || sub2 === "di" || sub2 === "fight") return handleTowerChallenge(api, message, p, senderId);
+      if (sub2L === "reset") return handleTowerReset(api, message, senderId);
+      if (sub2L === "auto") return handleTowerAuto(api, message, p, senderId);
+      if (sub2L === "challenge" || sub2L === "danh" || sub2L === "go" || sub2L === "di" || sub2L === "fight") return handleTowerChallenge(api, message, p, senderId);
       return handleTowerStatus(api, message, p, senderId);
     case "nhapdao":
       return handleNhapDao(api, message, p, senderId);
@@ -2433,6 +2504,10 @@ Tài khoản của bạn đã bị quản trị viên khóa do vi phạm quy đ�
       return handleGuiOld(api, message, p, senderId, sub2);
     case "phithang":
       return handlePhiThang(api, message, p, senderId);
+    case "luanhoi":
+      return handleLuanHoi(api, message, p, senderId, sub2);
+    case "giaiphong":
+      return handleGiaiPhong(api, message, p, senderId);
     case "donate":
       return handleDonate(api, message, p, senderId);
     case "start":
@@ -2450,7 +2525,7 @@ Tài khoản của bạn đã bị quản trị viên khóa do vi phạm quy đ�
     case "login":
       return handleLogin(api, message, p, senderId, sub2, sub3);
     case "dp":
-      if (sub2 === "auto") {
+      if (sub2L === "auto") {
         const val = (sub3 || "").toLowerCase();
         if (val === "on") { p.dpAuto = true; savePlayer(senderId); return api.sendMessage({ msg: "⚡ Đột Phá Auto: **BẬT**\n🔄 Tự động đột phá khi EXP đầy, dùng đan 4 để không bao giờ thất bại.", quote: message, ttl: 15000 }, message.threadId, message.type); }
         if (val === "off") { p.dpAuto = false; savePlayer(senderId); return api.sendMessage({ msg: "⚡ Đột Phá Auto: **TẮT**", quote: message, ttl: 15000 }, message.threadId, message.type); }
@@ -2466,7 +2541,7 @@ Tài khoản của bạn đã bị quản trị viên khóa do vi phạm quy đ�
     case "unbanbank":
       return handleUnbanBank(api, message, p, senderId);
     case "check":
-      if (sub2 === "bank") return handleCheckBank(api, message, p, senderId);
+      if (sub2L === "bank") return handleCheckBank(api, message, p, senderId);
       return handleCheckBuff(api, message, p, senderId);
     case "staff":
       return handleStaff(api, message, senderId, sub2);
@@ -2494,7 +2569,8 @@ ${p}tl daily — Nhận thưởng hàng ngày (LT + chuỗi ngày)
 ${p}tl top — Bảng xếp hạng top 20 (dạng ảnh)
 ${p}tl toplt — Top 20 tu sĩ giàu Linh Thạch nhất
 ${p}tl top donate — Top 20 donate
-${p}tl bag — Túi đồ (alias: b)
+${p}tl bag — Túi đồ trang 1 (alias: b)
+${p}tl bag <trang> — Xem túi đồ trang tiếp theo (VD: ${p}tl bag 2)
 ${p}tl map — Bản đồ tu tiên giới
 ${p}tl truyentong <ID> — Dịch chuyển tới địa điểm
 ${p}tl dummy attack — Đánh mộc nhân thử dame thật (tại Dummy Trial)
@@ -2545,6 +2621,11 @@ ${p}tl tubao — Tú bảo
 ${p}tl tuongdai — Thánh Địa Tượng Đài (7 Chí Tôn, tối thiểu cảnh 60)
 ${p}tl vieng [1-7] — Viếng tượng (1M LT, mỗi ngày 1 lần, roll 1 trong 3 buff ngày: hút máu/HP/ATK 10%)
 ${p}tl phithang — Phi thăng (cảnh giới tối cao → Luyện Khí, +20% chỉ số vĩnh viễn)
+🌀 LUÂN HỒI (tối đa 100 kiếp):
+${p}tl luanhoi — Xem preview + yêu cầu xác nhận
+${p}tl luanhoi xacnhan — Phong ấn stats kiếp này, reset về Luyện Khí (roll lại thiên phú/thể chất/huyết mạch/linh căn, XÓA SẠCH túi + Linh Thạch + Pháp tắc)
+${p}tl luanhoi info — Xem kho phong ấn / đã giải phong
+${p}tl giaiphong — Giải phong toàn bộ stats các kiếp, cộng vĩnh viễn vào stats hiện tại
 ${p}tl nhapdao / nhapma / nhapnho / nhapyeu / nhaplo / nhapquy / nhapphat — Nhập môn
 💡 Đan 43 (Đơn Tâm Đan): đòn trúng gây tối thiểu 1.5% HP Boss trong Tháp!`,
   },
@@ -2622,7 +2703,7 @@ ${p}tl kethon @user — Cầu hôn (${formatNumber(MARRIAGE_COST)} LT)
 ${p}tl dongy / ${p}tl tuchoi — Trả lời lời cầu hôn
 ${p}tl lyhon — Xin ly hôn • ${p}tl lyhon ok — Đồng ý
 ${p}tl songtu honnhan — Xem tình trạng hôn nhân
-💡 Đi bí cảnh về, đạo lữ được hưởng +50% EXP bí cảnh của bạn (2 chiều)
+💡 Đi bí cảnh về, đạo lữ được hưởng +50% EXP bí cảnh của anh (2 chiều)
 💡 Mỗi cấp hôn nhân +5% EXP bế quan & bí cảnh (tối đa Lv.10, tăng độ gắn bó bằng song tu cùng nhau)`,
   },
   {
@@ -2699,18 +2780,19 @@ ${topic.text(prefix)}
 }
 
 async function handleGuiOld(api, message, p, senderId, sub2) {
-  const on = sub2 === "on" || sub2 === "bat" || sub2 === "1" || sub2 === "cu";
-  const off = sub2 === "off" || sub2 === "tat" || sub2 === "0" || sub2 === "moi";
+  const k2 = String(sub2 || "").toLowerCase();
+  const on = k2 === "on" || k2 === "bat" || k2 === "1" || k2 === "cu";
+  const off = k2 === "off" || k2 === "tat" || k2 === "0" || k2 === "moi";
 
   if (!on && !off) {
     const prefix = getGlobalPrefix();
     return api.sendMessage({
       msg: `🖼️ GIAO DIỆN HỒ SƠ
 ━━━━━━━━━━━━━━━━
-🎨 Hiện tại: ${p.guiold !== false ? "Profile CŨ (cổ điển)" : "Profile MỚI (vũ trụ xanh)"}
+🎨 Hiện tại: ${p.guiold !== false ? "Vũ trụ tối (cổ điển)" : "Character Card mới"}
 ━━━━━━━━━━━━━━━━
-${prefix}tl guiold on — Dùng profile cũ
-${prefix}tl guiold off — Dùng profile mới`,
+${prefix}tl guiold on — Vũ trụ tối (giữ nguyên)
+${prefix}tl guiold off — Character Card mới`,
       quote: message, ttl: 30000,
     }, message.threadId, message.type);
   }
@@ -2719,13 +2801,13 @@ ${prefix}tl guiold off — Dùng profile mới`,
   savePlayer(senderId);
 
   const msg = on
-    ? `✅ ĐÃ BẬT PROFILE CŨ!
+    ? `✅ ĐÃ BẬT PROFILE VŨ TRỤ TỐI!
 ━━━━━━━━━━━━━━━━
-🖼️ Hồ sơ của bạn sẽ dùng giao diện cổ điển.
+🖼️ Hồ sơ của anh sẽ dùng giao diện vũ trụ tối.
 💡 ${getGlobalPrefix()}tl để xem lại.`
-    : `🆕 ĐÃ CHUYỂN SANG PROFILE MỚI!
+    : `🆕 ĐÃ CHUYỂN SANG CHARACTER CARD!
 ━━━━━━━━━━━━━━━━
-🌊 Giao diện vortex xanh dương, núi non hùng vĩ.
+⚔️ Giao diện character card mới (chiến lực, thông số, trang bị).
 💡 ${getGlobalPrefix()}tl để xem lại.`;
 
   await api.sendMessage({ msg, quote: message, ttl: 30000 }, message.threadId, message.type);
@@ -2745,7 +2827,7 @@ async function handleProfile(api, message, p, senderId) {
       }
     } catch {}
 
-    imagePath = await (p.guiold !== false ? generateProfileCardNew : generateProfileCardBlue)({ player: p, username, avatarUrl });
+    imagePath = await (p.guiold !== false ? generateProfileCardNew : generateProfileCardCharacter)({ player: p, username, avatarUrl });
     await api.sendMessage(
       { msg: "", attachments: [imagePath], ttl: 60000, quote: message },
       message.threadId,
@@ -2754,7 +2836,7 @@ async function handleProfile(api, message, p, senderId) {
   } catch (e) {
     console.error("Lỗi tạo ảnh profile tu-luyen:", e);
     await api.sendMessage(
-      { msg: "❌ Lỗi khi tạo ảnh hồ sơ. Vui lòng thử lại sau.", quote: message, ttl: 15000 },
+      { msg: "❌ Lỗi khi tạo ảnh hồ sơ. Anh thử lại giúp em nha 🥺 sau.", quote: message, ttl: 15000 },
       message.threadId,
       message.type,
     );
@@ -2851,7 +2933,7 @@ ${linhCan.emoji} Linh căn: ${linhCan.name} (×${linhCan.expMult} EXP)
 ✨ EXP Bonus: +${stats.expBonus}%
 ${stats.maxDmgPct > 0 ? `🔒 Chặn ST tối đa: ${stats.maxDmgPct}% HP (mỗi đòn)\n` : ""}💥 Lực Chiến: ${formatNumber(stats.battlePower)}
 🏅 Điểm PK: ${p.pkPoints || 0}
-${p.phithangCount > 0 ? `🌌 Phi Thăng: ×${p.phithangCount} (+${p.phithangCount * 20}% chỉ số cơ bản, +${Math.min(p.phithangCount * 10, 90)}% giảm thương)\n` : ""}
+${p.phithangCount > 0 ? `🌌 Phi Thăng: ×${p.phithangCount} (+${p.phithangCount * 20}% chỉ số cơ bản, +${Math.min(p.phithangCount * 10, 90)}% giảm thương)\n` : ""}${(p.luanhoiCount || 0) > 0 || luanhoiSealedTotal(p) > 0 || ((p.luanhoiReleased?.atk || 0) + (p.luanhoiReleased?.hp || 0) + (p.luanhoiReleased?.spd || 0) + (p.luanhoiReleased?.def || 0) > 0) ? `🌀 Luân Hồi: ${p.luanhoiCount || 0}/${LUANHOI_MAX} kiếp | 🔒 Phong ấn: ${formatLuanhoiStats(p.luanhoiSealed || {})} | 🔓 Đã giải phong: ${formatLuanhoiStats(p.luanhoiReleased || {})}\n` : ""}
 ━━━━━━━━━━━━━━━━
 ${theChat.emoji}+${huyetMach.emoji} Bonus: ${bonusParts.join(" | ")}
 ${trongThuongLine}
@@ -2874,12 +2956,12 @@ async function handlePrime(api, message, p, senderId) {
   let next = PRIME.find(pr => pr.level === current + 1) || null;
   const msg = `👑 HỆ THỐNG PRIME
 ━━━━━━━━━━━━━━━━
-💰 Bạn đã donate: ${formatNumber(donated)}đ
+💰 Anh đã donate: ${formatNumber(donated)}đ
 👑 Prime hiện tại: ${current > 0 ? `PRIME ${current} — ${PRIME.find(pr => pr.level === current).title}` : "Chưa có"}
 ━━━━━━━━━━━━━━━━
 ${lines.join("\n")}
 ━━━━━━━━━━━━━━━━
-${next ? `🔜 Mốc tiếp theo: ${next.name} — Nạp ${formatNumber(next.threshold)}đ` : "🎉 Bạn đã đạt PRIME 8 cao nhất!"}
+${next ? `🔜 Mốc tiếp theo: ${next.name} — Nạp ${formatNumber(next.threshold)}đ` : "🎉 Anh đã đạt PRIME 8 cao nhất!"}
 💡 ${prefix}tl donate để xem bảng giá`;
   return api.sendMessage({ msg, quote: message, ttl: 60000 }, message.threadId, message.type);
 }
@@ -2931,9 +3013,9 @@ ${lines.join("\n")}
 async function handleDanhhieu(api, message, p, senderId, sub2, sub3) {
   const prefix = getGlobalPrefix();
   if (!p.titles || p.titles.length === 0) {
-    return api.sendMessage({ msg: `❌ Bạn chưa có danh hiệu nào!\n💡 Donate ≥ 1.000đ để nhận danh hiệu "Mạnh Thường Quân".`, quote: message, ttl: 15000 }, message.threadId, message.type);
+    return api.sendMessage({ msg: `❌ Anh chưa có danh hiệu nào!\n💡 Donate ≥ 1.000đ để nhận danh hiệu "Mạnh Thường Quân".`, quote: message, ttl: 15000 }, message.threadId, message.type);
   }
-  if (sub2 === "equip") {
+  if (String(sub2||"").toLowerCase() === "equip") {
     const numStr = sub3 || "";
     if (!numStr.startsWith("+")) {
       return api.sendMessage({ msg: `❌ Dùng: ${prefix}tl danhhieu equip +<số>`, quote: message, ttl: 15000 }, message.threadId, message.type);
@@ -3081,7 +3163,7 @@ async function handleTop(api, message, senderId) {
   } catch (e) {
     console.error("Lỗi tạo ảnh top tu-luyen:", e);
     await api.sendMessage(
-      { msg: "❌ Lỗi khi tạo ảnh bảng xếp hạng. Vui lòng thử lại sau.", quote: message, ttl: 15000 },
+      { msg: "❌ Lỗi khi tạo ảnh bảng xếp hạng. Anh thử lại giúp em nha 🥺 sau.", quote: message, ttl: 15000 },
       message.threadId,
       message.type,
     );
@@ -3104,7 +3186,7 @@ async function handleDonate(api, message, p, senderId) {
   } catch (e) {
     console.error("Lỗi tạo ảnh donate tu-luyen:", e);
     await api.sendMessage(
-      { msg: "❌ Lỗi khi tạo ảnh bảng nạp. Vui lòng thử lại sau.", quote: message, ttl: 15000 },
+      { msg: "❌ Lỗi khi tạo ảnh bảng nạp. Anh thử lại giúp em nha 🥺 sau.", quote: message, ttl: 15000 },
       message.threadId,
       message.type,
     );
@@ -3120,13 +3202,13 @@ async function handleBeguanStart(api, message, p, senderId) {
   if (p.beguan && p.beguan.startedAt) {
     const left = Math.max(0, Math.ceil((getBeguanLimitMs(p) - (Date.now() - p.beguan.startedAt)) / 60000));
     return api.sendMessage({
-      msg: `❌ Bạn đang bế quan rồi! Còn ${left} phút nữa.\n💡 ${prefix}tl stop để thu hoạch ngay.`,
+      msg: `❌ Anh đang bế quan rồi! Còn ${left} phút nữa.\n💡 ${prefix}tl stop để thu hoạch ngay.`,
       quote: message, ttl: 15000,
     }, message.threadId, message.type);
   }
   if (p.inSecretRealm) {
     return api.sendMessage({
-      msg: `❌ Bạn đang ở Bí Cảnh! Rời bí cảnh (${prefix}tl bc ve) trước khi bế quan.`,
+      msg: `❌ Anh đang ở Bí Cảnh! Rời bí cảnh (${prefix}tl bc ve) trước khi bế quan.`,
       quote: message, ttl: 15000,
     }, message.threadId, message.type);
   }
@@ -3156,7 +3238,7 @@ async function handleBeguanStop(api, message, p, senderId) {
   const prefix = getGlobalPrefix();
   if (!p.beguan || !p.beguan.startedAt) {
     return api.sendMessage({
-      msg: `❌ Bạn chưa bế quan! Dùng ${prefix}tl start để bắt đầu.`,
+      msg: `❌ Anh chưa bế quan! Dùng ${prefix}tl start để bắt đầu.`,
       quote: message, ttl: 15000,
     }, message.threadId, message.type);
   }
@@ -3180,7 +3262,10 @@ async function handleBeguanStop(api, message, p, senderId) {
   const thanhDiaMult = getLocation(p)?.id === "thanhdia" ? 1.5 : 1;
   const marBonus = getMarriageExpBonus(p);
   const isSongTu = !!(p.beguan?.songTu);
-  const expGained = Math.floor(baseExp * BEGUAN_EXP_MULTIPLIER * fraction * (1 + (stats.expBonus || 0) / 100) * linhCan.expMult * threadExpMult * thanhDiaMult * (1 + marBonus / 100) * (isSongTu ? 1.35 : 1));
+  // Đan 28 (secret_exp) chỉ tác dụng trong bí cảnh — bế quan loại trừ
+  const secretExpBonus = getBuffValue(p, "secret_exp_boost_pct") || 0;
+  const beguanExpBonus = (stats.expBonus || 0) - secretExpBonus;
+  const expGained = Math.floor(baseExp * BEGUAN_EXP_MULTIPLIER * fraction * (1 + (beguanExpBonus || 0) / 100) * linhCan.expMult * threadExpMult * thanhDiaMult * (1 + marBonus / 100) * (isSongTu ? 1.35 : 1));
   const stonesGained = Math.floor((BEGUAN_STONES_MIN + Math.random() * (BEGUAN_STONES_MAX - BEGUAN_STONES_MIN)) * fraction);
 
   let songTuLine = "";
@@ -3200,6 +3285,8 @@ async function handleBeguanStop(api, message, p, senderId) {
   p.exp = (p.exp || 0) + expGained;
   p.spiritStones = (p.spiritStones || 0) + stonesGained;
   p.beguan = null;
+  // Đan 2 dùng 1 lần cho lần tu luyện/bí cảnh tới
+  consumeBuffSrc(p, "exp_boost_pct", "2");
   savePlayer(senderId);
 
   const newMaxExp = getMaxExp(p.majorRealm, p.minorRealm, p.daotam);
@@ -3209,7 +3296,7 @@ async function handleBeguanStop(api, message, p, senderId) {
   const msg = `🧘 KẾT THÚC BẾ QUAN!
 ━━━━━━━━━━━━━━━━
 ⏰ Thời gian: ${elapsedMin} phút (×${(fraction * 100).toFixed(0)}%)
-✨ EXP nhận: +${formatNumber(expGained)}${thanhDiaMult !== 1 ? ` (×1.5 Thánh Địa)` : ""}${threadExpMult !== 1 ? ` (×${threadExpMult} nhóm)` : ""}${stats.expBonus ? ` (+${stats.expBonus}% thể chất)` : ""}${marBonus ? ` (+${marBonus}% đạo lữ)` : ""}${songTuLine}${linhCan.expMult !== 1 ? ` (×${linhCan.expMult} linh căn)` : ""}
+✨ EXP nhận: +${formatNumber(expGained)}${thanhDiaMult !== 1 ? ` (×1.5 Thánh Địa)` : ""}${threadExpMult !== 1 ? ` (×${threadExpMult} nhóm)` : ""}${beguanExpBonus ? ` (+${beguanExpBonus}% thể chất/đan)` : ""}${marBonus ? ` (+${marBonus}% đạo lữ)` : ""}${songTuLine}${linhCan.expMult !== 1 ? ` (×${linhCan.expMult} linh căn)` : ""}
 💎 LT nhận: +${formatNumber(stonesGained)}${bondLine}
 ━━━━━━━━━━━━━━━━
 📊 EXP [${bar}] ${expPercent}%
@@ -3310,7 +3397,7 @@ async function handleStaff(api, message, senderId, sub2) {
 
   const data = loadData();
 
-  if (sub2 === "on") {
+  if (String(sub2||"").toLowerCase() === "on") {
     data.staffLocked = false;
     saveData();
     return api.sendMessage({
@@ -3322,7 +3409,7 @@ async function handleStaff(api, message, senderId, sub2) {
     }, message.threadId, message.type);
   }
 
-  if (sub2 === "off") {
+  if (String(sub2||"").toLowerCase() === "off") {
     data.staffLocked = true;
     saveData();
     return api.sendMessage({
@@ -3399,7 +3486,7 @@ async function handleAdmin(api, message, senderId) {
   ];
 
   if (!isDang) {
-    const lines = ["🛠️ LỆNH ADMIN TU LUYỆN", ...staffLines, "━━━━━━━━━━━━━━━", "✨ Bạn đang xem lệnh nhóm Staff!"];
+    const lines = ["🛠️ LỆNH ADMIN TU LUYỆN", ...staffLines, "━━━━━━━━━━━━━━━", "✨ Anh đang xem lệnh nhóm Staff!"];
     await api.sendMessage({ msg: lines.join("\n"), quote: message, ttl: 60000 }, message.threadId, message.type);
     return;
   }
@@ -3408,8 +3495,10 @@ async function handleAdmin(api, message, senderId) {
     "━━━━━━━━━━━━━━━",
     "🔱 NHÓM ĐẤNG SÁNG THẾ — Staff không dùng được",
     `${prefix}tl buff item <ID> [sl] @user — Ban vật phẩm`,
+    `${prefix}tl buff item <ID> all — Ban vật phẩm toàn server`,
+    `${prefix}tl buff item <ID> 0 [@user] — Thu vật phẩm (có tag = chỉ thu người đó)`,
     `${prefix}tl buff item sang_the_lenh 1 @user — Ban Sáng Thế Lệnh`,
-    `${prefix}tl buff item sang_the_lenh 0 — Thu hồi toàn bộ Sáng Thế Lệnh`,
+    `${prefix}tl buff item sang_the_lenh 0 [@user] — Thu toàn bộ (có tag = chỉ thu người đó)`,
     `${prefix}tl staff on/off — Kích hoạt/Tạm khóa toàn bộ quyền Sáng Thế Lệnh`,
     `${prefix}tl banacc @user — Khóa tài khoản game`,
     `${prefix}tl unban @user — Mở khóa tài khoản game`,
@@ -3466,7 +3555,7 @@ async function handleDangKy(api, message, p, senderId, username, password) {
   const already = data.sessions[senderId] || Object.values(data.accounts).find(a => a.ownerUid === senderId);
   if (already) {
     return api.sendMessage({
-      msg: `⚠️ Bạn đã đăng ký tài khoản rồi! Mỗi người chỉ được đăng ký 1 lần.\n💡 ${prefix}tl login <tài khoản> <mật khẩu> để đăng nhập.`,
+      msg: `⚠️ Anh đã đăng ký tài khoản rồi! Mỗi người chỉ được đăng ký 1 lần.\n💡 ${prefix}tl login <tài khoản> <mật khẩu> để đăng nhập.`,
       quote: message, ttl: 15000,
     }, message.threadId, message.type);
   }
@@ -3483,7 +3572,7 @@ async function handleDangKy(api, message, p, senderId, username, password) {
 👤 Tài khoản: ${username}
 🗝️ Mật khẩu: đã mã hóa an toàn
 ━━━━━━━━━━━━━━━━
-📦 Nhân vật tu tiên của bạn đã được sao lưu vào tài khoản này.
+📦 Nhân vật tu tiên của anh đã được sao lưu vào tài khoản này.
 📱 Muốn đăng nhập trên Zalo khác: ${prefix}tl login ${username} <mật khẩu>`,
     quote: message, ttl: 30000,
   }, message.threadId, message.type);
@@ -3518,7 +3607,7 @@ async function handleLogin(api, message, p, senderId, username, password) {
 
   if (data.sessions[senderId] === username) {
     return api.sendMessage({
-      msg: `ℹ️ Bạn đang đăng nhập tài khoản "${username}" trên Zalo này rồi!`,
+      msg: `ℹ️ Anh đang đăng nhập tài khoản "${username}" trên Zalo này rồi!`,
       quote: message, ttl: 15000,
     }, message.threadId, message.type);
   }
@@ -3532,12 +3621,12 @@ async function handleLogin(api, message, p, senderId, username, password) {
 👤 Tài khoản: ${username}
 ━━━━━━━━━━━━━━━━
 📦 Nhân vật tu tiên đã được đồng bộ vào Zalo này!
-💡 ${prefix}tl để xem hồ sơ của bạn.`,
+💡 ${prefix}tl để xem hồ sơ của anh.`,
     quote: message, ttl: 30000,
   }, message.threadId, message.type);
 }
 
-const BAN_ACC_ADMIN_ID = "350261016567599395";
+const BAN_ACC_ADMIN_ID = "4174146276273089692";
 
 function isBanAccAdmin(senderId) {
   return isDangSangThe(senderId) || isSangThe(senderId);
@@ -3922,7 +4011,8 @@ ${lines.join("\n")}
   return api.sendMessage({ msg, quote: message, ttl: 60000 }, message.threadId, message.type);
 }
 
-async function handleBag(api, message, p, senderId) {
+async function handleBag(api, message, p, senderId, pageStr = "") {
+  const prefix = getGlobalPrefix();
   const ul = (id) => { const l = getUpgradeLevel(p, id); return l > 0 ? ` [+${l}]` : ""; };
   const equippedWeapon = p.equippedWeapon ? WEAPONS.find(w => w.id === p.equippedWeapon) : null;
   let equippedLine = "Chưa trang bị";
@@ -3955,101 +4045,101 @@ async function handleBag(api, message, p, senderId) {
   }
 
   const weaponIds = Object.keys(p.inventory.weapons || {});
-  let weaponLines = "Không có";
-  if (weaponIds.length > 0) {
-    weaponLines = weaponIds.map(id => {
-      const w = WEAPONS.find(w => w.id === id);
-      if (!w) return "";
-      const eq = p.equippedWeapon === id ? " ✅" : "";
-      return `${w.emoji} ${w.name}${ul(id)}${eq} \`ID: ${w.id}\``;
-    }).filter(Boolean).join("\n");
-  }
-
   const armorIds = Object.keys(p.inventory.armors || {});
-  let armorLines = "Không có";
-  if (armorIds.length > 0) {
-    armorLines = armorIds.map(id => {
-      const a = ARMORS.find(a => a.id === id);
-      if (!a) return "";
-      const eq = p.equippedArmor === id ? " ✅" : "";
-      return `${a.emoji} ${a.name}${ul(id)}${eq} \`ID: ${a.id}\``;
-    }).filter(Boolean).join("\n");
-  }
-
   const potionIds = Object.keys(p.inventory.potions || {});
-  let potionLines = "Không có";
-  if (potionIds.length > 0) {
-    potionLines = potionIds.map(id => {
-      const po = POTIONS.find(po => po.id === id) || getTokenItem(id);
-      const name = po ? `${po.emoji} ${po.name}` : id;
-      return `${name} x${p.inventory.potions[id]} \`ID: ${id}\``;
-    }).join("\n");
-  }
-
   const phapTacIds = Object.keys(p.inventory.phapTac || {});
-  let phapTacLines = "Không có";
-  if (phapTacIds.length > 0) {
-    phapTacLines = phapTacIds.map(id => {
-      const sp = SPECIAL_ITEMS.find(s => s.id === id);
-      if (!sp) return "";
-      const eq = p.equippedPhapTac === id ? " ✅" : "";
-      return `${sp.emoji} ${sp.name}${eq} \`ID: ${sp.id}\``;
-    }).filter(Boolean).join("\n");
-  }
-
   const phapBaoIds = Object.keys(p.inventory.phapBao || {});
-  let phapBaoLines = "Không có";
-  if (phapBaoIds.length > 0) {
-    phapBaoLines = phapBaoIds.map(id => {
-      const pb = PHAP_BAO.find(pb => pb.id === id);
-      if (!pb) return "";
-      const eq = p.equippedPhapBao === id ? " ✅" : "";
-      return `${pb.emoji} ${pb.name}${ul(id)}${eq} \`ID: ${pb.id}\``;
-    }).filter(Boolean).join("\n");
-  }
-
   const matIds = Object.keys(p.inventory.materials || {}).filter(k => (p.inventory.materials[k] || 0) > 0);
-  let matLines = "Không có";
-  if (matIds.length > 0) {
-    matLines = matIds.map(id => `${getMatLabel(id)} ×${p.inventory.materials[id]}`).join("\n");
+
+  const resolvePotionName = (id) => {
+    const po = POTIONS.find(po => po.id === id) || CONGPHA.find(c => c.id === id) || getTokenItem(id);
+    if (po) return `${po.emoji} ${po.name}`;
+    if (typeof id === "string" && id.startsWith("sd_")) {
+      const key = id.slice(3);
+      const sd = SHOPDEN_POOL.find(e => (e.key || e.ref) === key);
+      if (sd) {
+        if (sd.ref) {
+          const base = POTIONS.find(po => po.id === sd.ref);
+          return `${base ? base.emoji : "🌑"} ${sd.name || base?.name || id}`;
+        }
+        return `${sd.emoji || "🌑"} ${sd.name || id}`;
+      }
+      if (key.startsWith("dau_an_")) return `🔖 Dấu Ấn ${id}`;
+      return `🌑 ${id}`;
+    }
+    return id;
+  };
+
+  // Gộp toàn bộ túi đồ thành 1 list, phân trang kiểu wiki để không vượt giới hạn text
+  const allEntries = [];
+  for (const id of weaponIds) {
+    const w = WEAPONS.find(w => w.id === id);
+    const eq = p.equippedWeapon === id ? " ✅" : "";
+    allEntries.push({ section: `🗡️ Vũ Khí (${weaponIds.length})`, text: w ? `${w.emoji} ${w.name}${ul(id)}${eq} \`ID: ${w.id}\`` : `${id} \`ID: ${id}\`` });
+  }
+  for (const id of armorIds) {
+    const a = ARMORS.find(a => a.id === id);
+    const eq = p.equippedArmor === id ? " ✅" : "";
+    allEntries.push({ section: `🛡️ Giáp (${armorIds.length})`, text: a ? `${a.emoji} ${a.name}${ul(id)}${eq} \`ID: ${a.id}\`` : `${id} \`ID: ${id}\`` });
+  }
+  for (const id of phapTacIds) {
+    const sp = SPECIAL_ITEMS.find(s => s.id === id);
+    const eq = p.equippedPhapTac === id ? " ✅" : "";
+    allEntries.push({ section: `🌪️ Skill (${phapTacIds.length})`, text: sp ? `${sp.emoji} ${sp.name}${eq} \`ID: ${sp.id}\`` : `${id} \`ID: ${id}\`` });
+  }
+  for (const id of phapBaoIds) {
+    const pb = PHAP_BAO.find(pb => pb.id === id);
+    const eq = p.equippedPhapBao === id ? " ✅" : "";
+    allEntries.push({ section: `🔮 Pháp Bảo (${phapBaoIds.length})`, text: pb ? `${pb.emoji} ${pb.name}${ul(id)}${eq} \`ID: ${pb.id}\`` : `${id} \`ID: ${id}\`` });
+  }
+  for (const id of potionIds) {
+    allEntries.push({ section: `💊 Đan Dược (${potionIds.length} loại)`, text: `${resolvePotionName(id)} x${p.inventory.potions[id]} \`ID: ${id}\`` });
+  }
+  for (const id of matIds) {
+    allEntries.push({ section: `🌾 Nguyên Liệu (${matIds.length} loại)`, text: `${getMatLabel(id)} ×${p.inventory.materials[id]}` });
   }
 
-  const msg = `🎒 TÚI ĐỒ
+  const pageSize = 12;
+  const total = Math.max(1, Math.ceil(allEntries.length / pageSize));
+  const page = Math.max(1, parseInt(pageStr || "1", 10) || 1);
+  const pn = Math.min(page, total);
+  const slice = allEntries.slice((pn - 1) * pageSize, pn * pageSize);
+
+  // Gom theo section để hiển thị gọn trong trang
+  let body = "Trống trơn — chưa có vật phẩm nào!";
+  if (slice.length > 0) {
+    const groups = [];
+    let cur = null;
+    for (const e of slice) {
+      if (!cur || cur.section !== e.section) {
+        cur = { section: e.section, lines: [] };
+        groups.push(cur);
+      }
+      cur.lines.push(e.text);
+    }
+    body = groups.map(g => `${g.section}:\n${g.lines.join("\n")}`).join("\n━━━━━━━━━━━━━━━━\n");
+  }
+
+  const assetLine = `💎 ${formatNumber(p.spiritStones)} LT | 🦴 ${p.bones || 0} | 👻 ${p.soul || 0} | 🔥 ${p.fire || 0}`;
+  const head = pn === 1
+    ? `${assetLine}\n━━━━━━━━━━━━━━━\n⚔️ Đang dùng:\n${equippedLine}\n━━━━━━━━━━━━━━━\n`
+    : `${assetLine}\n━━━━━━━━━━━━━━━\n`;
+
+  const msg = `🎒 TÚI ĐỒ (Trang ${pn}/${total})
 ━━━━━━━━━━━━━━━
-💎 Linh Thạch: ${formatNumber(p.spiritStones)}
-🦴 Xương: ${p.bones || 0}
-👻 Soul: ${p.soul || 0}
-🔥 Fire: ${p.fire || 0}
+${head}${body}
 ━━━━━━━━━━━━━━━
-🌾 Nguyên Liệu:
-${matLines}
-━━━━━━━━━━━━━━━
-⚔️ Đang dùng: ${equippedLine}
-━━━━━━━━━━━━━━━
-🗡️ Vũ Khí (${weaponIds.length}):
-${weaponLines}
-━━━━━━━━━━━━━━━
-🛡️ Giáp (${armorIds.length}):
-${armorLines}
-━━━━━━━━━━━━━━━
-🌪️ Skill (${phapTacIds.length}):
-${phapTacLines}
-━━━━━━━━━━━━━━━
-🔮 Pháp Bảo (${phapBaoIds.length}):
-${phapBaoLines}
-━━━━━━━━━━━━━━━
-💊 Đan Dược:
-${potionLines}
-━━━━━━━━━━━━━━━
-💡 ${getGlobalPrefix()}tl equip <ID> | tl use <ID>`;
+📄 Trang ${pn}/${total} • ${prefix}tl bag <trang> (VD: ${prefix}tl bag 2)
+💡 ${prefix}tl equip <ID> | ${prefix}tl use <ID>`;
 
   await api.sendMessage({ msg, quote: message, ttl: 60000 }, message.threadId, message.type);
 }
 
 async function handleWiki(api, message, p, sub2, sub3) {
   const prefix = getGlobalPrefix();
+  const k2 = String(sub2 || "").toLowerCase();
 
-  if (sub2 === "thechat") {
+  if (k2 === "thechat") {
     const page = Math.max(1, parseInt(sub3 || "1", 10));
     const pageSize = 6;
     const total = Math.ceil(THECHAT.length / pageSize);
@@ -4084,7 +4174,7 @@ ${lines.join("\n━━━━━━━━━━━━━━━━\n")}
     return api.sendMessage({ msg, quote: message, ttl: 60000 }, message.threadId, message.type);
   }
 
-  if (sub2 === "huyetmach") {
+  if (String(sub2||"").toLowerCase() === "huyetmach") {
     const page = Math.max(1, parseInt(sub3 || "1", 10));
     const pageSize = 6;
     const total = Math.ceil(HUYETMACH.length / pageSize);
@@ -4120,7 +4210,7 @@ ${lines.join("\n━━━━━━━━━━━━━━━━\n")}
     return api.sendMessage({ msg, quote: message, ttl: 60000 }, message.threadId, message.type);
   }
 
-  if (sub2 === "linhcan") {
+  if (String(sub2||"").toLowerCase() === "linhcan") {
     const page = Math.max(1, parseInt(sub3 || "1", 10));
     const pageSize = 8;
     const total = Math.ceil(LINH_CAN.length / pageSize);
@@ -4141,7 +4231,7 @@ ${lines.join("\n━━━━━━━━━━━━━━━━\n")}
     return api.sendMessage({ msg, quote: message, ttl: 60000 }, message.threadId, message.type);
   }
 
-  if (sub2 === "thienphu" || sub2 === "thienphu") {
+  if (String(sub2||"").toLowerCase() === "thienphu" || String(sub2||"").toLowerCase() === "thienphu") {
     const lines = Object.entries(TALENTS).map(([key, ti]) =>
       `${ti.emoji} ${ti.name} \`${key}\`\n💪 EXP ×${ti.multiplier}\n🧠 Ngộ Tính: ${ti.ngoBase} | 🍀 Phúc Duyên: ${ti.phucBase}`
     );
@@ -4154,7 +4244,7 @@ ${lines.join("\n━━━━━━━━━━━━━━━━\n")}
     return api.sendMessage({ msg, quote: message, ttl: 60000 }, message.threadId, message.type);
   }
 
-  if (sub2 === "giap" || sub2 === "giáp") {
+  if (String(sub2||"").toLowerCase() === "giap" || String(sub2||"").toLowerCase() === "giáp") {
     const daoMap = { chinh: "⚡ Chính Đạo", ma: "⚫ Ma Đạo", nho: "🎓 Nho Đạo", yeu: "🐾 Yêu Đạo", lo: "🫙 Lọ Đạo", quy: "👻 Quỷ Đạo", phat: "🪷 Phật Đạo" };
     const page = Math.max(1, parseInt(sub3 || "1", 10));
     const pageSize = 6;
@@ -4193,13 +4283,13 @@ ${lines.join("\n━━━━━━━━━━━━━━━━\n")}
   }
 
   let realmList, isMa = false, isNho = false, isYeu = false, isLo = false, isQuy = false, isPhat = false;
-  if (sub2 === "madao" || sub2 === "ma") { realmList = MA_REALMS; isMa = true; }
-  else if (sub2 === "nhodao" || sub2 === "nho") { realmList = NHO_REALMS; isNho = true; }
-  else if (sub2 === "yeudao" || sub2 === "yeu") { realmList = YEU_REALMS; isYeu = true; }
-  else if (sub2 === "lodao" || sub2 === "lo") { realmList = LO_REALMS; isLo = true; }
-  else if (sub2 === "quydao" || sub2 === "quy") { realmList = QUY_REALMS; isQuy = true; }
-  else if (sub2 === "phatdao" || sub2 === "phat") { realmList = PHAT_REALMS; isPhat = true; }
-  else if (sub2 === "canhgioi" || sub2 === "canh" || sub2 === "chinh") { realmList = REALMS; }
+  if (String(sub2||"").toLowerCase() === "madao" || String(sub2||"").toLowerCase() === "ma") { realmList = MA_REALMS; isMa = true; }
+  else if (String(sub2||"").toLowerCase() === "nhodao" || String(sub2||"").toLowerCase() === "nho") { realmList = NHO_REALMS; isNho = true; }
+  else if (String(sub2||"").toLowerCase() === "yeudao" || String(sub2||"").toLowerCase() === "yeu") { realmList = YEU_REALMS; isYeu = true; }
+  else if (String(sub2||"").toLowerCase() === "lodao" || String(sub2||"").toLowerCase() === "lo") { realmList = LO_REALMS; isLo = true; }
+  else if (String(sub2||"").toLowerCase() === "quydao" || String(sub2||"").toLowerCase() === "quy") { realmList = QUY_REALMS; isQuy = true; }
+  else if (String(sub2||"").toLowerCase() === "phatdao" || String(sub2||"").toLowerCase() === "phat") { realmList = PHAT_REALMS; isPhat = true; }
+  else if (String(sub2||"").toLowerCase() === "canhgioi" || String(sub2||"").toLowerCase() === "canh" || String(sub2||"").toLowerCase() === "chinh") { realmList = REALMS; }
   else realmList = REALMS;
   const pageRaw = (isMa || isNho || isYeu || isLo || isQuy || isPhat) ? sub3 : sub3 || sub2;
   const parsedPage = parseInt(pageRaw, 10);
@@ -4233,7 +4323,7 @@ const LOCATIONS = [
     id: "dummy",
     name: "Dummy Trial (Thí Luyện Mộc Nhân)",
     emoji: "🎯",
-    desc: "Mộc nhân copy toàn bộ chỉ số của bạn — đánh thử dame THẬT giống như đánh lên người chơi, cả phản đòn.",
+    desc: "Mộc nhân copy toàn bộ chỉ số của anh — đánh thử dame THẬT giống như đánh lên người chơi, cả phản đòn.",
     features: "dummy attack",
   },
   {
@@ -4275,7 +4365,7 @@ async function handleTruyenTong(api, message, p, senderId, sub2) {
     return api.sendMessage({
       msg: `🌀 TRUYỀN TỐNG
 ━━━━━━━━━━━━━━━━
-📍 Bạn đang ở: ${cur ? `${cur.emoji} ${cur.name}` : "🏘️ Làng Tu Tiên (khu tự do)"}
+📍 Anh đang ở: ${cur ? `${cur.emoji} ${cur.name}` : "🏘️ Làng Tu Tiên (khu tự do)"}
 💡 ${prefix}tl map — Xem bản đồ
 💡 ${prefix}tl truyentong <ID> — Dịch chuyển tức thời (miễn phí)
 💡 ${prefix}tl truyentong ve — Rời về khu tự do`,
@@ -4286,7 +4376,7 @@ async function handleTruyenTong(api, message, p, senderId, sub2) {
   const key = sub2.toLowerCase();
   if (key === "ve" || key === "roi" || key === "out") {
     if (!cur) {
-      return api.sendMessage({ msg: `ℹ️ Bạn đang ở khu tự do rồi!`, quote: message, ttl: 15000 }, message.threadId, message.type);
+      return api.sendMessage({ msg: `ℹ️ Anh đang ở khu tự do rồi!`, quote: message, ttl: 15000 }, message.threadId, message.type);
     }
     p.location = null;
     savePlayer(senderId);
@@ -4306,7 +4396,7 @@ async function handleTruyenTong(api, message, p, senderId, sub2) {
   }
 
   if (target.id === cur?.id) {
-    return api.sendMessage({ msg: `ℹ️ Bạn đang ở ${target.emoji} ${target.name} rồi!`, quote: message, ttl: 15000 }, message.threadId, message.type);
+    return api.sendMessage({ msg: `ℹ️ Anh đang ở ${target.emoji} ${target.name} rồi!`, quote: message, ttl: 15000 }, message.threadId, message.type);
   }
 
   p.location = target.id;
@@ -4341,7 +4431,7 @@ async function handleDummy(api, message, p, senderId, sub2) {
     return api.sendMessage({
       msg: `🎯 THÍ LUYỆN MỘC NHÂN
 ━━━━━━━━━━━━━━━━
-Mộc nhân copy TOÀN BỘ chỉ số của bạn (ATK/DEF/HP/Né/Phản...) — dame ra đây chính là dame thật khi đánh lên người chơi.
+Mộc nhân copy TOÀN BỘ chỉ số của anh (ATK/DEF/HP/Né/Phản...) — dame ra đây chính là dame thật khi đánh lên người chơi.
 ⚔️ ${prefix}tl dummy attack — Ra đòn thử lực
 🔁 Mộc nhân có phản đòn như bạn → xem luôn mình sẽ ăn phản bao nhiêu`,
       quote: message, ttl: 30000,
@@ -4363,7 +4453,7 @@ Mộc nhân copy TOÀN BỘ chỉ số của bạn (ATK/DEF/HP/Né/Phản...) �
     return api.sendMessage({
       msg: `🎯 DUMMY TRIAL
 ━━━━━━━━━━━━━━━━
-💨 Mộc nhân NÉ được đòn của bạn! (Né ${dummy.dodge}%)
+💨 Mộc nhân NÉ được đòn của anh! (Né ${dummy.dodge}%)
 ━━━━━━━━━━━━━━━━
 💡 Gõ ${prefix}tl dummy attack để ra đòn tiếp.`,
       quote: message, ttl: 30000,
@@ -4425,7 +4515,7 @@ async function handleHoChoi(api, message, p, senderId) {
   const used = p.hocHoiUsed || 0;
   if (used >= HOCHOI_DAILY_LIMIT) {
     return api.sendMessage({
-      msg: `❌ Bạn đã học hết ${HOCHOI_DAILY_LIMIT} lượt từ các tiền bối!
+      msg: `❌ Anh đã học hết ${HOCHOI_DAILY_LIMIT} lượt từ các tiền bối!
 🙏 10 lượt học là cơ duyên đặc biệt dành cho tân nhân — không bao giờ reset. Hãy tự tu luyện tiếp nhé!`,
       quote: message, ttl: 15000,
     }, message.threadId, message.type);
@@ -4444,7 +4534,7 @@ async function handleHoChoi(api, message, p, senderId) {
   await api.sendMessage({
     msg: `🏯 HỌC HỎI TIỀN BỐI
 ━━━━━━━━━━━━━━━━
-🧙 Một vị tiền bối truyền cho bạn vài câu đạo pháp...
+🧙 Một vị tiền bối truyền cho anh vài câu đạo pháp...
 ✨ EXP nhận: +${formatNumber(expGained)} (${HOCHOI_EXP_PCT}% EXP đột phá)
 🎫 Lượt học còn lại: ${HOCHOI_DAILY_LIMIT - used - 1}/${HOCHOI_DAILY_LIMIT} (không reset)
 ━━━━━━━━━━━━━━━━
@@ -4466,7 +4556,7 @@ async function handleRutKiem(api, message, p, senderId) {
 
   if (hasItem(senderId, RUTKIEM_WEAPON_ID)) {
     return api.sendMessage({
-      msg: `🗿 ${weapon.emoji} ${weapon.name} đã là của bạn rồi! Đạo hữu còn tham gì nữa.\n💡 ${prefix}tl equip ${RUTKIEM_WEAPON_ID} để trang bị.`,
+      msg: `🗿 ${weapon.emoji} ${weapon.name} đã là của anh rồi! Đạo hữu còn tham gì nữa.\n💡 ${prefix}tl equip ${RUTKIEM_WEAPON_ID} để trang bị.`,
       quote: message, ttl: 30000,
     }, message.threadId, message.type);
   }
@@ -4565,18 +4655,18 @@ async function handleThuRut(api, message, p, senderId) {
 
   if (hasItem(senderId, ODEN_ID)) {
     return api.sendMessage({
-      msg: `⚔️ Bạn đã sở hữu Song Kiếm Oden — Yama đã hòa vào đó rồi!\n💡 Không còn gì để rút nữa.`,
+      msg: `⚔️ Anh đã sở hữu Song Kiếm Oden — Yama đã hòa vào đó rồi!\n💡 Không còn gì để rút nữa.`,
       quote: message, ttl: 30000,
     }, message.threadId, message.type);
   }
   if (hasItem(senderId, YAMA_ID)) {
     return api.sendMessage({
-      msg: `☠️ ${yama.emoji} ${yama.name} đã là của bạn!\n💡 Chuỗi nhiệm vụ tiếp theo: cầm Yama (${prefix}tl equip ${YAMA_ID}) rồi dùng ${prefix}tl fight để thách đấu Boss Hỗn Độn (cảnh 27) và đoạt Tushita từ tay nó!`,
+      msg: `☠️ ${yama.emoji} ${yama.name} đã là của anh!\n💡 Chuỗi nhiệm vụ tiếp theo: cầm Yama (${prefix}tl equip ${YAMA_ID}) rồi dùng ${prefix}tl fight để thách đấu Boss Hỗn Độn (cảnh 27) và đoạt Tushita từ tay nó!`,
       quote: message, ttl: 30000,
     }, message.threadId, message.type);
   }
   if (p.trongThuongUntil && Date.now() < p.trongThuongUntil) {
-    return api.sendMessage({ msg: `❌ Bạn đang trọng thương! Hồi phục rồi hãy liều mạng với Yama.`, quote: message, ttl: 15000 }, message.threadId, message.type);
+    return api.sendMessage({ msg: `❌ Anh đang trọng thương! Hồi phục rồi hãy liều mạng với Yama.`, quote: message, ttl: 15000 }, message.threadId, message.type);
   }
 
   // Hồi chiêu 10 phút chỉ áp dụng SAU KHI kết thúc chuỗi lượt thứ 3
@@ -4612,7 +4702,7 @@ async function handleThuRut(api, message, p, senderId) {
 💥 CRIT: +${yama.crit}%
 ⚡ ST Chuẩn: +${yama.trueDmg}%
 ━━━━━━━━━━━━━━━━
-🎯 Bạn đã đánh bại tử thần!
+🎯 Anh đã đánh bại tử thần!
 💡 Tiếp theo: ${prefix}tl equip ${YAMA_ID} rồi dùng ${prefix}tl fight để thách đấu Boss Hỗn Độn (cảnh 27) cầm Tushita!
 🌸 Nghe đồn: nếu gom đủ cả Yama lẫn Tushita, sẽ có chuyện kỳ lạ xảy ra...`;
     const fusionMsg = checkSongKiemFusion(senderId, message.data.dName || "Đạo hữu");
@@ -4630,7 +4720,7 @@ async function handleThuRut(api, message, p, senderId) {
 
     const deathMsgs = [
       "☠️ Yama tự rút ra khỏi vỏ — nhưng nhắm vào chính chủ nhân tương lai của nó!",
-      "💀 Vong linh trong kiếm trỗi dậy, hút cạn sinh khí của bạn trong một tiếng thét!",
+      "💀 Vong linh trong kiếm trỗi dậy, hút cạn sinh khí của anh trong một tiếng thét!",
       "🌑 Bóng đen của Yama phủ xuống... Bạn ngã gục trước khi chạm được chuôi kiếm!",
     ];
     return api.sendMessage({
@@ -4704,7 +4794,7 @@ async function handleGacha(api, message, p, senderId) {
     const resetTime = p.gachaResetAt + GACHA_RESET_MS;
     const remainMin = Math.ceil((resetTime - now) / 60000);
     return api.sendMessage({
-      msg: `❌ Bạn đã hết lượt quay! Hết hạn sau ${remainMin} phút nữa.`,
+      msg: `❌ Anh đã hết lượt quay! Hết hạn sau ${remainMin} phút nữa.`,
       quote: message, ttl: 15000
     }, threadId, message.type);
   }
@@ -4791,12 +4881,12 @@ async function handleAttackSoul(api, message, p, senderId) {
   
   // Kiểm tra đang ở Bí Cảnh
   if (p.inSecretRealm) {
-    return api.sendMessage({ msg: `❌ Bạn đang ở Bí Cảnh! Rời đi trước khi triệu hồi Thần Chết.`, quote: message, ttl: 15000 }, message.threadId, message.type);
+    return api.sendMessage({ msg: `❌ Anh đang ở Bí Cảnh! Rời đi trước khi triệu hồi Thần Chết.`, quote: message, ttl: 15000 }, message.threadId, message.type);
   }
   
   // Kiểm tra trọng thương
   if (p.trongThuongUntil && Date.now() < p.trongThuongUntil) {
-    return api.sendMessage({ msg: `❌ Bạn đang trọng thương! Hồi phục trước khi thách đấu Thần Chết.`, quote: message, ttl: 15000 }, message.threadId, message.type);
+    return api.sendMessage({ msg: `❌ Anh đang trọng thương! Hồi phục trước khi thách đấu Thần Chết.`, quote: message, ttl: 15000 }, message.threadId, message.type);
   }
   
   const boss = soulBossState[threadKey];
@@ -4806,7 +4896,7 @@ async function handleAttackSoul(api, message, p, senderId) {
     // Kiểm tra Soul
     if ((p.soul || 0) < 1) {
       return api.sendMessage({
-        msg: `❌ Bạn cần ít nhất 1 Soul để triệu hồi Thần Chết!\n💡 Soul có thể nhận từ gacha: ${prefix}tl gacha`,
+        msg: `❌ Anh cần ít nhất 1 Soul để triệu hồi Thần Chết!\n💡 Soul có thể nhận từ gacha: ${prefix}tl gacha`,
         quote: message, ttl: 15000
       }, message.threadId, message.type);
     }
@@ -4961,7 +5051,7 @@ async function handleExFire(api, message, p, senderId) {
   // Kiểm tra đã có Kiếm Lửa chưa
   if (hasItem(senderId, FIRE_SWORD_ID)) {
     return api.sendMessage({
-      msg: `❌ Bạn đã sở hữu Kiếm Lửa rồi!`,
+      msg: `❌ Anh đã sở hữu Kiếm Lửa rồi!`,
       quote: message, ttl: 15000
     }, threadId, message.type);
   }
@@ -4969,7 +5059,7 @@ async function handleExFire(api, message, p, senderId) {
   // Kiểm tra Fire
   if ((p.fire || 0) < 1) {
     return api.sendMessage({
-      msg: `❌ Bạn cần 1 Fire (Lửa thiêng) để đổi Kiếm Lửa! Fire có thể nhận từ gacha.`,
+      msg: `❌ Anh cần 1 Fire (Lửa thiêng) để đổi Kiếm Lửa! Fire có thể nhận từ gacha.`,
       quote: message, ttl: 15000
     }, threadId, message.type);
   }
@@ -5001,7 +5091,7 @@ async function handleExFire(api, message, p, senderId) {
   
   const msg = `🔥🔥🔥 KIẾM LỬA ĐÃ ĐƯỢC RÈN! 🔥🔥🔥
 ━━━━━━━━━━━━━━━━
-🎁 Bạn đã nhận được Kiếm Lửa!
+🎁 Anh đã nhận được Kiếm Lửa!
 ⚔️ ATK: 100Qa
 🎯 CRIT: +10%
 💀 Bỏ qua giảm thương
@@ -5018,7 +5108,7 @@ async function handleGhepOden(api, message, p, senderId) {
   const prefix = getGlobalPrefix();
   if (hasItem(senderId, ODEN_ID)) {
     return api.sendMessage({
-      msg: `⚔️ Bạn đã sở hữu Song Kiếm Oden rồi — không còn gì để ghép!`,
+      msg: `⚔️ Anh đã sở hữu Song Kiếm Oden rồi — không còn gì để ghép!`,
       quote: message, ttl: 30000,
     }, message.threadId, message.type);
   }
@@ -5051,13 +5141,13 @@ async function handleThucTinhOden(api, message, p, senderId) {
   const prefix = getGlobalPrefix();
   if (hasItem(senderId, ODEN_3_ID)) {
     return api.sendMessage({
-      msg: `🔱 Song Kiếm Oden của bạn đã THỨC TỈNH — không thể thức tỉnh lần nữa!`,
+      msg: `🔱 Song Kiếm Oden của anh đã THỨC TỈNH — không thể thức tỉnh lần nữa!`,
       quote: message, ttl: 30000,
     }, message.threadId, message.type);
   }
   if (!hasItem(senderId, ODEN_ID)) {
     return api.sendMessage({
-      msg: `❌ Bạn chưa có ⚔️ Oden - Song Kiếm Trảm Long để thức tỉnh!
+      msg: `❌ Anh chưa có ⚔️ Oden - Song Kiếm Trảm Long để thức tỉnh!
 ━━━━━━━━━━━━━━
 ☠️ Yama: ${prefix}tl thurut
 🌸 Tushita: ${prefix}tl fight
@@ -5116,7 +5206,7 @@ async function handleFightTushita(api, message, p, senderId) {
 
   if (hasItem(senderId, TUSHITA_ID) || hasItem(senderId, ODEN_ID) || hasItem(senderId, ODEN_3_ID)) {
     return api.sendMessage({
-      msg: `🌸 Bạn đã sở hữu Tushita (hoặc Oden) rồi! Hỗn Độn Kiếm Linh không còn gì để mất.\n💡 Dùng ${prefix}tl equip để trang bị.`,
+      msg: `🌸 Anh đã sở hữu Tushita (hoặc Oden) rồi! Hỗn Độn Kiếm Linh không còn gì để mất.\n💡 Dùng ${prefix}tl equip để trang bị.`,
       quote: message, ttl: 30000,
     }, message.threadId, message.type);
   }
@@ -5188,11 +5278,11 @@ async function handleFightTushita(api, message, p, senderId) {
     for (const [who] of seq) {
       if (who === "me" && hpMe > 0 && hpBoss > 0) {
         if (!hasYamaPower) {
-          roundLines.push(`🚫 Hiệp ${r}: Đòn của bạn xuyên qua người ${name} như vô hình — cần CẦM Yama mới làm nó đau!`);
+          roundLines.push(`🚫 Hiệp ${r}: Đòn của anh xuyên qua người ${name} như vô hình — cần CẦM Yama mới làm nó đau!`);
           continue;
         }
         const res = strike(myStats, bStats, bStats.dodge, bStats.dmgReduction, 0, bStats.hp, false);
-        if (res.dodge) { roundLines.push(`💨 Hiệp ${r}: ${name} né đòn của bạn!`); continue; }
+        if (res.dodge) { roundLines.push(`💨 Hiệp ${r}: ${name} né đòn của anh!`); continue; }
         const leech = Math.floor(res.dmg * myStats.lifesteal / 100);
         hpMe = Math.min(myStats.hp, hpMe + leech);
         hpBoss = Math.max(0, hpBoss - res.dmg);
@@ -5386,7 +5476,7 @@ async function handleMoQua(api, message, p, senderId, sub2) {
   const alreadyOpenedBy = session.boxes.find(b => b.byId === String(senderId));
   if (alreadyOpenedBy) {
     return api.sendMessage({
-      msg: `❌ Bạn đã mở hộp số ${session.boxes.indexOf(alreadyOpenedBy) + 1} rồi! Mỗi người chỉ được mở 1 hộp.`,
+      msg: `❌ Anh đã mở hộp số ${session.boxes.indexOf(alreadyOpenedBy) + 1} rồi! Mỗi người chỉ được mở 1 hộp.`,
       quote: message, ttl: 15000,
     }, threadId, message.type);
   }
@@ -5481,7 +5571,7 @@ ${prefix}tl shop old — 🧰 Chợ Đồ Cũ (vũ khí hỏng, giá rẻ)`;
     return api.sendMessage({ msg, quote: message, ttl: 30000 }, message.threadId, message.type);
   }
 
-  if (sub2 === "old" || sub2 === "cu") {
+  if (String(sub2||"").toLowerCase() === "old" || String(sub2||"").toLowerCase() === "cu") {
     const pageSize = 5;
     const page = Math.max(1, parseInt(sub3 || "1", 10));
     const total = Math.ceil(OLD_WEAPONS.length / pageSize);
@@ -5510,7 +5600,7 @@ ${lines.join("\n━━━━━━━━━━━━━━━━\n")}
     return api.sendMessage({ msg, quote: message, ttl: 60000 }, message.threadId, message.type);
   }
 
-  if (sub2 === "prime") {
+  if (String(sub2||"").toLowerCase() === "prime") {
     if (!primeShopUnlocked) {
       return api.sendMessage({ msg: `🔒 SHOP PRIME BỊ KHÓA!
 ━━━━━━━━━━━━━━━━
@@ -5534,7 +5624,7 @@ ${lines.join("\n━━━━━━━━━━━━━━━━\n")}
     return api.sendMessage({ msg, quote: message, ttl: 60000 }, message.threadId, message.type);
   }
 
-  if (sub2 === "nguyenlieu" || sub2 === "taphoa" || sub2 === "nl") {
+  if (String(sub2||"").toLowerCase() === "nguyenlieu" || String(sub2||"").toLowerCase() === "taphoa" || String(sub2||"").toLowerCase() === "nl") {
     const page = Math.max(1, parseInt(sub3 || "1", 10) || 1);
     const pageSize = 7;
     const total = Math.ceil(MATERIALS.length / pageSize);
@@ -5555,7 +5645,7 @@ ${lines.join("\n━━━━━━━━━━━━━━━━\n")}
     return api.sendMessage({ msg, quote: message, ttl: 60000 }, message.threadId, message.type);
   }
 
-  if (sub2 === "vukhi") {
+  if (String(sub2||"").toLowerCase() === "vukhi") {
     const shopWeapons = WEAPONS.filter(w => !w.id.startsWith("old_") && !w.noShop);
     const page = Math.max(1, parseInt(sub3 || "1", 10));
     const pageSize = 5;
@@ -5586,7 +5676,7 @@ ${tierLegend}
     return api.sendMessage({ msg, quote: message, ttl: 60000 }, message.threadId, message.type);
   }
 
-  if (sub2 === "giap" || sub2 === "giáp") {
+  if (String(sub2||"").toLowerCase() === "giap" || String(sub2||"").toLowerCase() === "giáp") {
     const page = Math.max(1, parseInt(sub3 || "1", 10));
     const pageSize = 6;
     const total = Math.ceil(ARMORS.length / pageSize);
@@ -5624,7 +5714,7 @@ ${lines.join("\n━━━━━━━━━━━━━━━━\n")}
     return api.sendMessage({ msg, quote: message, ttl: 60000 }, message.threadId, message.type);
   }
 
-  if (sub2 === "danduoc") {
+  if (String(sub2||"").toLowerCase() === "danduoc") {
     const page = Math.max(1, parseInt(sub3 || "1", 10));
     const pageSize = 10;
     const total = Math.ceil(POTIONS.length / pageSize);
@@ -5644,7 +5734,7 @@ ${lines.join("\n━━━━━━━━━━━━━━━━\n")}
     return api.sendMessage({ msg, quote: message, ttl: 60000 }, message.threadId, message.type);
   }
 
-  if (sub2 === "congphap") {
+  if (String(sub2||"").toLowerCase() === "congphap") {
     const page = Math.max(1, parseInt(sub3 || "1", 10));
     const pageSize = 10;
     const total = Math.ceil(CONGPHA.length / pageSize);
@@ -5664,7 +5754,7 @@ ${lines.join("\n━━━━━━━━━━━━━━━━\n")}
     return api.sendMessage({ msg, quote: message, ttl: 60000 }, message.threadId, message.type);
   }
 
-  if (sub2 === "phapbao" || sub2 === "pb") {
+  if (String(sub2||"").toLowerCase() === "phapbao" || String(sub2||"").toLowerCase() === "pb") {
     const lines = PHAP_BAO.map((pb, i) => {
       const idx = i + 1;
       const parts = [];
@@ -5674,7 +5764,13 @@ ${lines.join("\n━━━━━━━━━━━━━━━━\n")}
       if (pb.expBonus) parts.push(`✨ EXP+${pb.expBonus}%`);
       if (pb.bossScale) parts.push(`🗼 Kháng Boss ${pb.bossScale}%`);
       if (pb.reflect) parts.push(`🔁 Phản+${pb.reflect}%`);
-      return `[${idx}] ${pb.emoji} ${pb.name} \`ID: ${pb.id}\`\n💰 ${formatNumber(pb.price)} LT\n📊 ${parts.join(", ")}\n📖 ${pb.desc}`;
+      if (pb.trueDmg) parts.push(`⚡ ST Chuẩn+${pb.trueDmg}%`);
+      if (pb.dodge) parts.push(`💨 Né+${pb.dodge}%`);
+      if (pb.dmgReduction) parts.push(`🛡️ Giảm ST+${pb.dmgReduction}%`);
+      if (pb.vongHon) parts.push(`👻 Vong Hồn (né đòn kết liễu 1 lần/trận)`);
+      const { price: salePrice, sale } = getFlashSalePrice(pb.price, pb.id);
+      const priceLine = sale ? `💰 ${formatNumber(pb.price)} → ${formatNumber(salePrice)} LT\n${formatFlashSaleLine(sale, pb.id, salePrice)}` : `💰 ${formatNumber(pb.price)} LT`;
+      return `[${idx}] ${pb.emoji} ${pb.name} \`ID: ${pb.id}\`\n${priceLine}\n📊 ${parts.join(", ")}\n📖 ${pb.desc}`;
     });
 
     const msg = `🔮 TIỆM PHÁP BẢO
@@ -5787,9 +5883,13 @@ ${potion.emoji} ${potion.name} \`ID: ${potion.id}\`
   if (congpha) {
     const stats = [];
     if (congpha.maxStamina) stats.push(`🟢 Thể lực tối đa +${congpha.maxStamina}`);
+    if (congpha.learnFailRate != null) stats.push(`📖 Tỉ lệ học thất bại ${congpha.learnFailRate}% (mất sách)`);
+    if (congpha.reviveChance != null) stats.push(`💫 ${congpha.reviveChance}% hồi sinh với ${congpha.reviveHpPct || 100}% máu trong PK`);
     const msg = `🔍 TRA CỨU CÔNG PHÁP
 ━━━━━━━━━━━━━━━━
 ${congpha.emoji} ${congpha.name} \`ID: ${congpha.id}\`
+━━━━━━━━━━━━━━━━
+💰 Giá: ${formatNumber(congpha.price)} LT
 ━━━━━━━━━━━━━━━━
 ${stats.length ? `📊 ${stats.join("\n")}\n━━━━━━━━━━━━━━━━\n` : ""}📖 Tác dụng: ${congpha.desc}`;
     return api.sendMessage({ msg, quote: message, ttl: 60000 }, message.threadId, message.type);
@@ -5831,6 +5931,10 @@ ${token.emoji} ${token.name} \`ID: ${token.id}\`
     if (phapBao.expBonus) stats.push(`✨ EXP +${phapBao.expBonus}%`);
     if (phapBao.bossScale) stats.push(`🗼 Kháng Boss ${phapBao.bossScale}%`);
     if (phapBao.reflect) stats.push(`🔁 Phản +${phapBao.reflect}%`);
+    if (phapBao.trueDmg) stats.push(`⚡ ST Chuẩn +${phapBao.trueDmg}%`);
+    if (phapBao.dodge) stats.push(`💨 Né +${phapBao.dodge}%`);
+    if (phapBao.dmgReduction) stats.push(`🛡️ Giảm ST +${phapBao.dmgReduction}%`);
+    if (phapBao.vongHon) stats.push(`👻 Vong Hồn: né 100% đòn kết liễu tiếp theo (1 lần/trận PK)`);
     const msg = `🔍 TRA CỨU PHÁP BẢO
 ━━━━━━━━━━━━━━━
 ${phapBao.emoji} ${phapBao.name} \`ID: ${phapBao.id}\`
@@ -5952,7 +6056,7 @@ async function handleFastSell(api, message, p, senderId, sub2, sub3, sub4) {
   const sales = getFlashSales();
   const now = Date.now();
 
-  if (!sub2 || sub2 === "list") {
+  if (!sub2 || String(sub2||"").toLowerCase() === "list") {
     const active = Object.entries(sales).filter(([, s]) => now < s.expiresAt)
       .sort((a, b) => a[1].expiresAt - b[1].expiresAt);
     if (active.length === 0) {
@@ -5984,7 +6088,7 @@ ${lines.join("\n")}
     }, message.threadId, message.type);
   }
 
-  if (sub2 === "off" || sub2 === "huy" || sub2 === "end") {
+  if (String(sub2||"").toLowerCase() === "off" || String(sub2||"").toLowerCase() === "huy" || String(sub2||"").toLowerCase() === "end") {
     if (!sub3 || !sales[sub3] || now >= sales[sub3].expiresAt) {
       return api.sendMessage({ msg: `❌ Không có flash sale đang chạy cho ID "${sub3 || "(trống)"}"!`, quote: message, ttl: 15000 }, message.threadId, message.type);
     }
@@ -6002,7 +6106,7 @@ ${lines.join("\n")}
   }
   const item = sub3 ? findShopItemAny(sub3) : null;
   if (!item) {
-    return api.sendMessage({ msg: `❌ Không tìm thấy đồ có ID "${sub3 || "(trống)"}"!\n💡 Xem ID: ${prefix}tl shop vukhi | giap | danduoc | nguyenlieu | congphap`, quote: message, ttl: 15000 }, message.threadId, message.type);
+    return api.sendMessage({ msg: `❌ Không tìm thấy đồ có ID "${sub3 || "(trống)"}"!\n💡 Xem ID: ${prefix}tl shop vukhi | giap | danduoc | nguyenlieu | congphap | phapbao`, quote: message, ttl: 15000 }, message.threadId, message.type);
   }
   const durMs = parseFastSellDuration(sub4);
   if (!durMs || durMs > 7 * 86400000) {
@@ -6036,7 +6140,7 @@ async function handleBuy(api, message, p, senderId, sub2, sub3) {
     return api.sendMessage({ msg: `❌ Cú pháp: ${prefix}tl buy <ID> [số lượng]\nVD: ${prefix}tl buy w1`, quote: message, ttl: 15000 }, message.threadId, message.type);
   }
 
-  const material = MATERIALS.find(m => m.id === sub2);
+  const material = MATERIALS.find(m => m.id.toLowerCase() === String(sub2||"").toLowerCase());
   if (material) {
     const qty = Math.max(1, Math.min(parseInt(sub3 || "1", 10) || 1, 1e15));
     const { price: unitPrice, sale } = getFlashSalePrice(material.price, material.id);
@@ -6063,17 +6167,17 @@ ${sale ? formatFlashSaleLine(sale, material.id, unitPrice) + "\n" : ""}💰 Đã
     return api.sendMessage({ msg, quote: message, ttl: 30000 }, message.threadId, message.type);
   }
 
-  const armor = ARMORS.find(a => a.id === sub2);
+  const armor = ARMORS.find(a => a.id.toLowerCase() === String(sub2||"").toLowerCase());
   if (armor) {
     if (armor.dao && armor.dao !== p.daotam) {
       const daoName = getDaoDisplay(armor.dao);
-      return api.sendMessage({ msg: `❌ ${armor.name} chỉ dành cho ${daoName}! Bạn đang theo ${getDaoDisplay(p.daotam)}.`, quote: message, ttl: 15000 }, message.threadId, message.type);
+      return api.sendMessage({ msg: `❌ ${armor.name} chỉ dành cho ${daoName}! Anh đang theo ${getDaoDisplay(p.daotam)}.`, quote: message, ttl: 15000 }, message.threadId, message.type);
     }
     if (p.spiritStones < getFlashSalePrice(armor.price, armor.id).price) {
       return api.sendMessage({ msg: `❌ Không đủ LT! Cần ${formatNumber(getFlashSalePrice(armor.price, armor.id).price)} LT, bạn có ${formatNumber(p.spiritStones)} LT.`, quote: message, ttl: 15000 }, message.threadId, message.type);
     }
     if (p.inventory.armors[armor.id]) {
-      return api.sendMessage({ msg: `⚠️ Bạn đã có ${armor.name} rồi!`, quote: message, ttl: 15000 }, message.threadId, message.type);
+      return api.sendMessage({ msg: `⚠️ Anh đã có ${armor.name} rồi!`, quote: message, ttl: 15000 }, message.threadId, message.type);
     }
 
     const { price: armorCost, sale: armorSale } = getFlashSalePrice(armor.price, armor.id);
@@ -6091,7 +6195,7 @@ ${armorSale ? formatFlashSaleLine(armorSale, armor.id, armorCost) + "\n" : ""}�
     return api.sendMessage({ msg, quote: message, ttl: 30000 }, message.threadId, message.type);
   }
 
-  const weapon = WEAPONS.find(w => w.id === sub2);
+  const weapon = WEAPONS.find(w => w.id.toLowerCase() === String(sub2||"").toLowerCase());
   if (weapon) {
     if (weapon.noShop) {
       return api.sendMessage({ msg: `🔒 ${weapon.emoji} ${weapon.name} KHÔNG THỂ MUA bằng Linh Thạch!\n🗿 Nó vẫn cắm sâu trong tảng đá ngàn năm... chỉ kẻ có duyên mới rút ra được.\n💡 Thử vận may: ${prefix}tl rutkiem`, quote: message, ttl: 15000 }, message.threadId, message.type);
@@ -6100,7 +6204,7 @@ ${armorSale ? formatFlashSaleLine(armorSale, armor.id, armorCost) + "\n" : ""}�
       return api.sendMessage({ msg: `❌ Không đủ LT! Cần ${formatNumber(getFlashSalePrice(weapon.price, weapon.id).price)} LT, bạn có ${formatNumber(p.spiritStones)} LT.`, quote: message, ttl: 15000 }, message.threadId, message.type);
     }
     if (p.inventory.weapons[weapon.id]) {
-      return api.sendMessage({ msg: `⚠️ Bạn đã có ${weapon.name} rồi!`, quote: message, ttl: 15000 }, message.threadId, message.type);
+      return api.sendMessage({ msg: `⚠️ Anh đã có ${weapon.name} rồi!`, quote: message, ttl: 15000 }, message.threadId, message.type);
     }
 
     const { price: weaponCost, sale: weaponSale } = getFlashSalePrice(weapon.price, weapon.id);
@@ -6118,7 +6222,7 @@ ${weaponSale ? formatFlashSaleLine(weaponSale, weapon.id, weaponCost) + "\n" : "
     return api.sendMessage({ msg, quote: message, ttl: 30000 }, message.threadId, message.type);
   }
 
-  const potion = POTIONS.find(po => po.id === sub2);
+  const potion = POTIONS.find(po => po.id.toLowerCase() === String(sub2||"").toLowerCase());
   if (potion) {
     const qty = Math.max(1, Math.min(parseInt(sub3 || "1", 10) || 1, 1e15));
     const { price: potionUnitPrice, sale: potionSale } = getFlashSalePrice(potion.price, potion.id);
@@ -6142,18 +6246,18 @@ ${potionSale ? formatFlashSaleLine(potionSale, potion.id, potionUnitPrice) + "\n
     return api.sendMessage({ msg, quote: message, ttl: 30000 }, message.threadId, message.type);
   }
 
-  const congpha = CONGPHA.find(c => c.id === sub2);
+  const congpha = CONGPHA.find(c => c.id.toLowerCase() === String(sub2||"").toLowerCase());
   if (congpha) {
     if (congpha.id === "213" && !hasLearned(p, "34") && (p.maxStamina || 0) < 600) {
       return api.sendMessage({ msg: "❌ Bách Mạch Thông Thể yêu cầu học Bí Kiếp Cửu Chuyền Thể (id 34) trước!", quote: message, ttl: 15000 }, message.threadId, message.type);
     }
     if (hasLearned(p, congpha.id)) {
-      return api.sendMessage({ msg: `❌ Bạn đã học ${congpha.name} rồi! Mỗi công pháp chỉ học được 1 lần.`, quote: message, ttl: 15000 }, message.threadId, message.type);
+      return api.sendMessage({ msg: `❌ Anh đã học ${congpha.name} rồi! Mỗi công pháp chỉ học được 1 lần.`, quote: message, ttl: 15000 }, message.threadId, message.type);
     }
     if (p.spiritStones < getFlashSalePrice(congpha.price, congpha.id).price) {
       return api.sendMessage({ msg: `❌ Không đủ LT! Cần ${formatNumber(getFlashSalePrice(congpha.price, congpha.id).price)} LT, bạn có ${formatNumber(p.spiritStones)} LT.`, quote: message, ttl: 15000 }, message.threadId, message.type);
     }
-    if (p.maxStamina >= congpha.maxStamina) {
+    if (congpha.maxStamina && (p.maxStamina || 0) >= congpha.maxStamina) {
       return api.sendMessage({ msg: `⚠️ Giới hạn Thể Lực đã đạt ${congpha.maxStamina}! Không cần mua ${congpha.name}.`, quote: message, ttl: 15000 }, message.threadId, message.type);
     }
 
@@ -6172,7 +6276,7 @@ ${congphaSale ? formatFlashSaleLine(congphaSale, congpha.id, congphaCost) + "\n"
     return api.sendMessage({ msg, quote: message, ttl: 30000 }, message.threadId, message.type);
   }
 
-  const special = SPECIAL_ITEMS.find(s => s.id === sub2);
+  const special = SPECIAL_ITEMS.find(s => s.id.toLowerCase() === String(sub2||"").toLowerCase());
   if (special) {
     const primeLevel = getPrimeLevel(p.donated || 0);
     const req = special.primeRequired || 2;
@@ -6190,7 +6294,7 @@ ${congphaSale ? formatFlashSaleLine(congphaSale, congpha.id, congphaCost) + "\n"
       return api.sendMessage({ msg: `❌ Không đủ LT! Cần ${formatNumber(getFlashSalePrice(special.price, special.id).price)} LT, bạn có ${formatNumber(p.spiritStones)} LT.`, quote: message, ttl: 15000 }, message.threadId, message.type);
     }
     if ((p.inventory.phapTac?.[special.id] || 0) > 0) {
-      return api.sendMessage({ msg: `⚠️ Bạn đã sở hữu ${special.name} rồi!`, quote: message, ttl: 15000 }, message.threadId, message.type);
+      return api.sendMessage({ msg: `⚠️ Anh đã sở hữu ${special.name} rồi!`, quote: message, ttl: 15000 }, message.threadId, message.type);
     }
 
     const { price: specialCost, sale: specialSale } = getFlashSalePrice(special.price, special.id);
@@ -6207,14 +6311,14 @@ ${specialSale ? formatFlashSaleLine(specialSale, special.id, specialCost) + "\n"
     return api.sendMessage({ msg, quote: message, ttl: 30000 }, message.threadId, message.type);
   }
 
-  const phapBao = PHAP_BAO.find(pb => pb.id === sub2);
+  const phapBao = PHAP_BAO.find(pb => pb.id.toLowerCase() === String(sub2||"").toLowerCase());
   if (phapBao) {
     if (p.spiritStones < getFlashSalePrice(phapBao.price, phapBao.id).price) {
       return api.sendMessage({ msg: `❌ Không đủ LT! Cần ${formatNumber(getFlashSalePrice(phapBao.price, phapBao.id).price)} LT, bạn có ${formatNumber(p.spiritStones)} LT.`, quote: message, ttl: 15000 }, message.threadId, message.type);
     }
     if (!p.inventory.phapBao) p.inventory.phapBao = {};
     if (p.inventory.phapBao[phapBao.id]) {
-      return api.sendMessage({ msg: `⚠️ Bạn đã có ${phapBao.name} rồi!`, quote: message, ttl: 15000 }, message.threadId, message.type);
+      return api.sendMessage({ msg: `⚠️ Anh đã có ${phapBao.name} rồi!`, quote: message, ttl: 15000 }, message.threadId, message.type);
     }
 
     const { price: pbCost, sale: pbSale } = getFlashSalePrice(phapBao.price, phapBao.id);
@@ -6229,6 +6333,10 @@ ${specialSale ? formatFlashSaleLine(specialSale, special.id, specialCost) + "\n"
     if (phapBao.expBonus) pbParts.push(`✨ EXP+${phapBao.expBonus}%`);
     if (phapBao.bossScale) pbParts.push(`🗼 Kháng Boss ${phapBao.bossScale}%`);
     if (phapBao.reflect) pbParts.push(`🔁 Phản+${phapBao.reflect}%`);
+    if (phapBao.trueDmg) pbParts.push(`⚡ ST Chuẩn+${phapBao.trueDmg}%`);
+    if (phapBao.dodge) pbParts.push(`💨 Né+${phapBao.dodge}%`);
+    if (phapBao.dmgReduction) pbParts.push(`🛡️ Giảm ST+${phapBao.dmgReduction}%`);
+    if (phapBao.vongHon) pbParts.push(`👻 Vong Hồn`);
     const pbMsg = `🛒 MUA PHÁP BẢO THÀNH CÔNG!
 ━━━━━━━━━━━━━━━
 ${phapBao.emoji} ${phapBao.name}
@@ -6259,14 +6367,14 @@ function getRecipeCost(recipe) {
 async function handleLuyendan(api, message, p, senderId, sub2, sub3) {
   const prefix = getGlobalPrefix();
 
-  if (!sub2 || sub2 === "ct" || sub2 === "congthuc") {
+  if (!sub2 || String(sub2||"").toLowerCase() === "ct" || String(sub2||"").toLowerCase() === "congthuc") {
     const entries = Object.entries(RECIPES)
       .map(([pid, r]) => ({ potion: POTIONS.find(po => po.id === pid), r }))
       .filter(e => e.potion)
       .sort((a, b) => getRecipeCost(a.r) - getRecipeCost(b.r));
     const pageSize = 6;
     const totalPages = Math.ceil(entries.length / pageSize);
-    const pageArg = sub2 === "ct" || sub2 === "congthuc" ? sub3 : "1";
+    const pageArg = String(sub2||"").toLowerCase() === "ct" || String(sub2||"").toLowerCase() === "congthuc" ? sub3 : "1";
     const pn = Math.min(Math.max(1, parseInt(pageArg, 10) || 1), totalPages);
     const slice = entries.slice((pn - 1) * pageSize, pn * pageSize);
 
@@ -6286,7 +6394,7 @@ ${lines.join("\n━━━━━━━━━━━━━━━━\n")}
     return api.sendMessage({ msg, quote: message, ttl: 60000 }, message.threadId, message.type);
   }
 
-  const potion = POTIONS.find(po => po.id === sub2);
+  const potion = POTIONS.find(po => po.id.toLowerCase() === String(sub2||"").toLowerCase());
   if (!potion) {
     return api.sendMessage({ msg: `❌ Không tìm thấy đan dược ID ${sub2}! Xem công thức: ${prefix}tl luyendan`, quote: message, ttl: 15000 }, message.threadId, message.type);
   }
@@ -6358,17 +6466,17 @@ async function handleEquip(api, message, p, senderId, sub2) {
     return api.sendMessage({ msg: `❌ Cú pháp: ${prefix}tl equip <ID>`, quote: message, ttl: 15000 }, message.threadId, message.type);
   }
 
-  const armor = ARMORS.find(a => a.id === sub2);
+  const armor = ARMORS.find(a => a.id.toLowerCase() === String(sub2||"").toLowerCase());
   if (armor) {
     if (armor.dao && armor.dao !== p.daotam) {
       const daoName = getDaoDisplay(armor.dao);
-      return api.sendMessage({ msg: `❌ ${armor.name} chỉ dành cho ${daoName}! Bạn đang theo ${getDaoDisplay(p.daotam)}.`, quote: message, ttl: 15000 }, message.threadId, message.type);
+      return api.sendMessage({ msg: `❌ ${armor.name} chỉ dành cho ${daoName}! Anh đang theo ${getDaoDisplay(p.daotam)}.`, quote: message, ttl: 15000 }, message.threadId, message.type);
     }
     if (!p.inventory.armors || !p.inventory.armors[armor.id]) {
-      return api.sendMessage({ msg: `❌ Bạn chưa có ${armor.name}! Dùng ${prefix}tl buy ${armor.id} để mua.`, quote: message, ttl: 15000 }, message.threadId, message.type);
+      return api.sendMessage({ msg: `❌ Anh chưa có ${armor.name}! Dùng ${prefix}tl buy ${armor.id} để mua.`, quote: message, ttl: 15000 }, message.threadId, message.type);
     }
     if (p.equippedArmor === armor.id) {
-      return api.sendMessage({ msg: `⚠️ Bạn đang trang bị ${armor.name} rồi!`, quote: message, ttl: 15000 }, message.threadId, message.type);
+      return api.sendMessage({ msg: `⚠️ Anh đang trang bị ${armor.name} rồi!`, quote: message, ttl: 15000 }, message.threadId, message.type);
     }
 
     const oldArmor = p.equippedArmor ? ARMORS.find(a => a.id === p.equippedArmor) : null;
@@ -6387,13 +6495,13 @@ ${oldArmor ? `🎒 ${oldArmor.name} đã tự chuyển về túi đồ.\n` : ""}
     return api.sendMessage({ msg, quote: message, ttl: 30000 }, message.threadId, message.type);
   }
 
-  const special = SPECIAL_ITEMS.find(s => s.id === sub2);
+  const special = SPECIAL_ITEMS.find(s => s.id.toLowerCase() === String(sub2||"").toLowerCase());
   if (special) {
     if (!p.inventory.phapTac || !p.inventory.phapTac[special.id]) {
-      return api.sendMessage({ msg: `❌ Bạn chưa có ${special.name}! Dùng ${prefix}tl buy ${special.id} để mua.`, quote: message, ttl: 15000 }, message.threadId, message.type);
+      return api.sendMessage({ msg: `❌ Anh chưa có ${special.name}! Dùng ${prefix}tl buy ${special.id} để mua.`, quote: message, ttl: 15000 }, message.threadId, message.type);
     }
     if (p.equippedPhapTac === special.id) {
-      return api.sendMessage({ msg: `⚠️ Bạn đang trang bị ${special.name} rồi!`, quote: message, ttl: 15000 }, message.threadId, message.type);
+      return api.sendMessage({ msg: `⚠️ Anh đang trang bị ${special.name} rồi!`, quote: message, ttl: 15000 }, message.threadId, message.type);
     }
 
     const oldPhapTac = p.equippedPhapTac ? SPECIAL_ITEMS.find(s => s.id === p.equippedPhapTac) : null;
@@ -6410,13 +6518,13 @@ ${oldPhapTac ? `🎒 ${oldPhapTac.name} đã tự chuyển về túi đồ.\n` :
     return api.sendMessage({ msg, quote: message, ttl: 30000 }, message.threadId, message.type);
   }
 
-  const phapBao = PHAP_BAO.find(pb => pb.id === sub2);
+  const phapBao = PHAP_BAO.find(pb => pb.id.toLowerCase() === String(sub2||"").toLowerCase());
   if (phapBao) {
     if (!p.inventory.phapBao || !p.inventory.phapBao[phapBao.id]) {
-      return api.sendMessage({ msg: `❌ Bạn chưa có ${phapBao.name}! Dùng ${prefix}tl buy ${phapBao.id} để mua.`, quote: message, ttl: 15000 }, message.threadId, message.type);
+      return api.sendMessage({ msg: `❌ Anh chưa có ${phapBao.name}! Dùng ${prefix}tl buy ${phapBao.id} để mua.`, quote: message, ttl: 15000 }, message.threadId, message.type);
     }
     if (p.equippedPhapBao === phapBao.id) {
-      return api.sendMessage({ msg: `⚠️ Bạn đang trang bị ${phapBao.name} rồi!`, quote: message, ttl: 15000 }, message.threadId, message.type);
+      return api.sendMessage({ msg: `⚠️ Anh đang trang bị ${phapBao.name} rồi!`, quote: message, ttl: 15000 }, message.threadId, message.type);
     }
 
     const oldPb = p.equippedPhapBao ? PHAP_BAO.find(pb => pb.id === p.equippedPhapBao) : null;
@@ -6431,6 +6539,10 @@ ${oldPhapTac ? `🎒 ${oldPhapTac.name} đã tự chuyển về túi đồ.\n` :
     if (phapBao.expBonus) pbParts.push(`✨ EXP+${phapBao.expBonus}%`);
     if (phapBao.bossScale) pbParts.push(`🗼 Kháng Boss ${phapBao.bossScale}%`);
     if (phapBao.reflect) pbParts.push(`🔁 Phản+${phapBao.reflect}%`);
+    if (phapBao.trueDmg) pbParts.push(`⚡ ST Chuẩn+${phapBao.trueDmg}%`);
+    if (phapBao.dodge) pbParts.push(`💨 Né+${phapBao.dodge}%`);
+    if (phapBao.dmgReduction) pbParts.push(`🛡️ Giảm ST+${phapBao.dmgReduction}%`);
+    if (phapBao.vongHon) pbParts.push(`👻 Vong Hồn`);
     const pbMsg = `🔮 TRANG BỊ PHÁP BẢO THÀNH CÔNG!
 ━━━━━━━━━━━━━━━
 ${phapBao.emoji} ${phapBao.name}
@@ -6442,17 +6554,17 @@ ${oldPb ? `🎒 ${oldPb.name} đã tự chuyển về túi đồ.\n` : ""}
     return api.sendMessage({ msg: pbMsg, quote: message, ttl: 30000 }, message.threadId, message.type);
   }
 
-  const weapon = WEAPONS.find(w => w.id === sub2);
+  const weapon = WEAPONS.find(w => w.id.toLowerCase() === String(sub2||"").toLowerCase());
   if (!weapon) {
     return api.sendMessage({ msg: `❌ Không tìm thấy vũ khí/giáp ID ${sub2}!`, quote: message, ttl: 15000 }, message.threadId, message.type);
   }
 
   if (!p.inventory.weapons[weapon.id]) {
-    return api.sendMessage({ msg: `❌ Bạn chưa có ${weapon.name}! Dùng ${prefix}tl buy ${weapon.id} để mua.`, quote: message, ttl: 15000 }, message.threadId, message.type);
+    return api.sendMessage({ msg: `❌ Anh chưa có ${weapon.name}! Dùng ${prefix}tl buy ${weapon.id} để mua.`, quote: message, ttl: 15000 }, message.threadId, message.type);
   }
 
   if (p.equippedWeapon === weapon.id) {
-    return api.sendMessage({ msg: `⚠️ Bạn đang trang bị ${weapon.name} rồi!`, quote: message, ttl: 15000 }, message.threadId, message.type);
+    return api.sendMessage({ msg: `⚠️ Anh đang trang bị ${weapon.name} rồi!`, quote: message, ttl: 15000 }, message.threadId, message.type);
   }
 
   const oldWeapon = p.equippedWeapon ? WEAPONS.find(w => w.id === p.equippedWeapon) : null;
@@ -6473,7 +6585,7 @@ ${oldWeapon ? `🎒 ${oldWeapon.name} đã tự chuyển về túi đồ.\n` : "
 }
 
 async function handleUnequip(api, message, p, senderId, sub2) {
-  if (sub2 === "skill" || SPECIAL_ITEMS.find(s => s.id === sub2)) {
+  if (String(sub2||"").toLowerCase() === "skill" || SPECIAL_ITEMS.find(s => s.id.toLowerCase() === String(sub2||"").toLowerCase())) {
     if (!p.equippedPhapTac) {
       return api.sendMessage({ msg: "❌ Bạn không đang trang bị Skill nào!", quote: message, ttl: 15000 }, message.threadId, message.type);
     }
@@ -6483,7 +6595,7 @@ async function handleUnequip(api, message, p, senderId, sub2) {
     return api.sendMessage({ msg: `🔓 Đã tháo Skill ${special ? `${special.emoji} ${special.name}` : ""} và cất vào túi.`, quote: message, ttl: 15000 }, message.threadId, message.type);
   }
 
-  if (sub2 === "giap" || sub2 === "giáp") {
+  if (String(sub2||"").toLowerCase() === "giap" || String(sub2||"").toLowerCase() === "giáp") {
     if (!p.equippedArmor) {
       return api.sendMessage({ msg: "❌ Bạn không đang trang bị giáp nào!", quote: message, ttl: 15000 }, message.threadId, message.type);
     }
@@ -6493,7 +6605,7 @@ async function handleUnequip(api, message, p, senderId, sub2) {
     return api.sendMessage({ msg: `🔓 Đã tháo ${armor ? armor.name : "giáp"} và cất vào túi.`, quote: message, ttl: 15000 }, message.threadId, message.type);
   }
 
-  if (sub2 === "phapbao" || sub2 === "pb" || PHAP_BAO.find(pb => pb.id === sub2)) {
+  if (String(sub2||"").toLowerCase() === "phapbao" || String(sub2||"").toLowerCase() === "pb" || PHAP_BAO.find(pb => pb.id.toLowerCase() === String(sub2||"").toLowerCase())) {
     if (!p.equippedPhapBao) {
       return api.sendMessage({ msg: "❌ Bạn không đang trang bị Pháp Bảo nào!", quote: message, ttl: 15000 }, message.threadId, message.type);
     }
@@ -6503,7 +6615,7 @@ async function handleUnequip(api, message, p, senderId, sub2) {
     return api.sendMessage({ msg: `🔓 Đã tháo ${pb ? `${pb.emoji} ${pb.name}` : "Pháp Bảo"} và cất vào túi.`, quote: message, ttl: 15000 }, message.threadId, message.type);
   }
 
-  if (sub2 === "danhhieu" || sub2 === "dh" || TITLES.find(t => t.id === sub2)) {
+  if (String(sub2||"").toLowerCase() === "danhhieu" || String(sub2||"").toLowerCase() === "dh" || TITLES.find(t => t.id.toLowerCase() === String(sub2||"").toLowerCase())) {
     if (!p.equippedTitle) {
       return api.sendMessage({ msg: "❌ Bạn không đang mặc danh hiệu nào!", quote: message, ttl: 15000 }, message.threadId, message.type);
     }
@@ -6539,17 +6651,17 @@ async function handleUpgrade(api, message, p, senderId, sub2) {
   let currentLevel = 0;
 
   if (type === "weapon") {
-    if (!p.equippedWeapon) return api.sendMessage({ msg: `❌ Bạn chưa trang bị vũ khí nào! Dùng ${prefix}tl equip <ID> trước.`, quote: message, ttl: 15000 }, message.threadId, message.type);
+    if (!p.equippedWeapon) return api.sendMessage({ msg: `❌ Anh chưa trang bị vũ khí nào! Dùng ${prefix}tl equip <ID> trước.`, quote: message, ttl: 15000 }, message.threadId, message.type);
     item = WEAPONS.find(w => w.id === p.equippedWeapon);
     if (!item) return api.sendMessage({ msg: `❌ Không tìm thấy vũ khí!`, quote: message, ttl: 15000 }, message.threadId, message.type);
     currentLevel = getUpgradeLevel(p, item.id);
   } else if (type === "armor") {
-    if (!p.equippedArmor) return api.sendMessage({ msg: `❌ Bạn chưa trang bị giáp nào! Dùng ${prefix}tl equip <ID> trước.`, quote: message, ttl: 15000 }, message.threadId, message.type);
+    if (!p.equippedArmor) return api.sendMessage({ msg: `❌ Anh chưa trang bị giáp nào! Dùng ${prefix}tl equip <ID> trước.`, quote: message, ttl: 15000 }, message.threadId, message.type);
     item = ARMORS.find(a => a.id === p.equippedArmor);
     if (!item) return api.sendMessage({ msg: `❌ Không tìm thấy giáp!`, quote: message, ttl: 15000 }, message.threadId, message.type);
     currentLevel = getUpgradeLevel(p, item.id);
   } else if (type === "phapBao") {
-    if (!p.equippedPhapBao) return api.sendMessage({ msg: `❌ Bạn chưa trang bị pháp bảo nào! Dùng ${prefix}tl equip <ID> trước.`, quote: message, ttl: 15000 }, message.threadId, message.type);
+    if (!p.equippedPhapBao) return api.sendMessage({ msg: `❌ Anh chưa trang bị pháp bảo nào! Dùng ${prefix}tl equip <ID> trước.`, quote: message, ttl: 15000 }, message.threadId, message.type);
     item = PHAP_BAO.find(pb => pb.id === p.equippedPhapBao);
     if (!item) return api.sendMessage({ msg: `❌ Không tìm thấy pháp bảo!`, quote: message, ttl: 15000 }, message.threadId, message.type);
     currentLevel = getUpgradeLevel(p, item.id);
@@ -6563,7 +6675,7 @@ async function handleUpgrade(api, message, p, senderId, sub2) {
   const rate = upgradeSuccessRate(currentLevel);
 
   if ((p.spiritStones || 0) < cost) {
-    return api.sendMessage({ msg: `❌ Bạn cần **${formatNumber(cost)} Linh Thạch** để upgrade ${item.name} [+${currentLevel}] → [+${currentLevel + 1}]\n💰 Bạn đang có: ${formatNumber(p.spiritStones || 0)} LT`, quote: message, ttl: 15000 }, message.threadId, message.type);
+    return api.sendMessage({ msg: `❌ Anh cần **${formatNumber(cost)} Linh Thạch** để upgrade ${item.name} [+${currentLevel}] → [+${currentLevel + 1}]\n💰 Anh đang có: ${formatNumber(p.spiritStones || 0)} LT`, quote: message, ttl: 15000 }, message.threadId, message.type);
   }
 
   p.spiritStones -= cost;
@@ -6641,6 +6753,11 @@ function consumeBuff(p, type) {
   p.buffs = p.buffs.filter(b => b.type !== type);
 }
 
+function consumeBuffSrc(p, type, src) {
+  if (!p.buffs) return;
+  p.buffs = p.buffs.filter(b => !(b.type === type && b.src === src));
+}
+
 async function handleUse(api, message, p, senderId, sub2, sub3) {
   const prefix = getGlobalPrefix();
 
@@ -6648,7 +6765,7 @@ async function handleUse(api, message, p, senderId, sub2, sub3) {
     return api.sendMessage({ msg: `❌ Cú pháp: ${prefix}tl use <ID> [số lượng]`, quote: message, ttl: 15000 }, message.threadId, message.type);
   }
 
-  const NON_STACK_PILLS = new Set(["1", "2", "6", "8", "11", "22", "24", "27", "28", "29", "30", "31", "32", "37", "38", "50", "51", "52"]);
+  const NON_STACK_PILLS = new Set(["1", "2", "6", "8", "11", "22", "24", "27", "28", "29", "30", "31", "32", "33", "37", "38", "50", "51", "52"]);
 
   const rawId = sub2.replace(/^\+/, "").trim();
   const requestedQty = Math.max(1, parseInt(sub3 || "1", 10) || 1);
@@ -6696,7 +6813,47 @@ async function handleUse(api, message, p, senderId, sub2, sub3) {
     return api.sendMessage({ msg: "❌ Bách Mạch Thông Thể yêu cầu học Bí Kiếp Cửu Chuyền Thể (id 34) trước!", quote: message, ttl: 15000 }, message.threadId, message.type);
   }
   if (congpha && hasLearned(p, congpha.id)) {
-    return api.sendMessage({ msg: `❌ Bạn đã học ${congpha.name} rồi! Mỗi công pháp chỉ học được 1 lần.`, quote: message, ttl: 15000 }, message.threadId, message.type);
+    return api.sendMessage({ msg: `❌ Anh đã học ${congpha.name} rồi! Mỗi công pháp chỉ học được 1 lần.`, quote: message, ttl: 15000 }, message.threadId, message.type);
+  }
+
+  // ── 200: Bí Kíp Cải Tử Hoàn Sinh — 70% thất bại, mất sách ──
+  if (item.id === "200") {
+    const failRate = congpha?.learnFailRate ?? 70;
+    const attempts = Math.min(qty, have);
+    let used = 0;
+    let success = false;
+    for (let a = 0; a < attempts; a++) {
+      used++;
+      if (Math.random() * 100 >= failRate) {
+        success = true;
+        break;
+      }
+    }
+    removeItem(senderId, item.id, used);
+    if (success) {
+      if (!hasLearned(p, item.id)) {
+        p.learnedCongPha.push(item.id);
+      }
+      savePlayer(senderId);
+      const remaining = p.inventory.potions[item.id] || 0;
+      const msg = `${item.emoji} TU LUYỆN CÔNG PHÁP THÀNH CÔNG!
+━━━━━━━━━━━━━━━━
+${item.name}
+📖 Ngộ ra sinh tử luân hồi — từ nay PK khi bị đánh chết có 3% hồi sinh với 100% máu (1 lần/trận)!
+━━━━━━━━━━━━━━━━
+📦 Còn lại: ${remaining} quyển`;
+      return api.sendMessage({ msg, quote: message, ttl: 30000 }, message.threadId, message.type);
+    }
+    savePlayer(senderId);
+    const remaining = p.inventory.potions[item.id] || 0;
+    const msg = `${item.emoji} LĨNH NGỘ THẤT BẠI!
+━━━━━━━━━━━━━━━━
+${item.name}
+💥 Tẩu hỏa khi tham ngộ sinh tử! Bí kíp đã tan thành tro bụi (mất ${used} quyển).
+💡 Mua lại: ${prefix}tl buy 200 rồi ${prefix}tl use 200 học tiếp cho tới thành công!
+━━━━━━━━━━━━━━━━
+📦 Còn lại: ${remaining} quyển`;
+    return api.sendMessage({ msg, quote: message, ttl: 30000 }, message.threadId, message.type);
   }
 
   let effectLines = [];
@@ -6719,7 +6876,7 @@ async function handleUse(api, message, p, senderId, sub2, sub3) {
       // ── 2: Tụ Linh Đan ───────────────────────────────────────────────
       case "2":
         applyBuffNoStack(p, "exp_boost_pct", 20, 24 * 60 * 60 * 1000, "Tụ Linh Đan: +20% EXP", "2");
-        buffApplied = "+20% EXP cho lần tu luyện/bí cảnh tới (24h)";
+        buffApplied = "+20% EXP cho lần tu luyện/bí cảnh tới (dùng 1 lần, hết hạn sau 24h)";
         break;
 
       // ── 3: Hộ Tâm Đan ────────────────────────────────────────────────
@@ -6904,19 +7061,19 @@ async function handleUse(api, message, p, senderId, sub2, sub3) {
       // ── 27: Hộ Mệnh Đan ──────────────────────────────────────────────
       case "27":
         applyBuffNoStack(p, "secret_dmg_reduction_pct", 30, 24 * 60 * 60 * 1000, "Hộ Mệnh Đan: -30% sát thương bí cảnh", "27");
-        buffApplied = "🛡️ Giảm 30% sát thương trong bí cảnh lần tới (24h)";
+        buffApplied = "🛡️ Giảm 30% sát thương trong lần bí cảnh tới (dùng 1 lần, hết hạn sau 24h)";
         break;
 
       // ── 28: Thám Hiểm Đan ────────────────────────────────────────────
       case "28":
         applyBuffNoStack(p, "secret_exp_boost_pct", 25, 24 * 60 * 60 * 1000, "Thám Hiểm Đan: +25% EXP bí cảnh", "28");
-        buffApplied = "🗺️ +25% EXP từ bí cảnh lần tới (24h)";
+        buffApplied = "🗺️ +25% EXP cho lần bí cảnh tới (dùng 1 lần, hết hạn sau 24h)";
         break;
 
       // ── 29: Tầm Bảo Đan ──────────────────────────────────────────────
       case "29":
         applyBuffNoStack(p, "secret_loot_boost_pct", 20, 24 * 60 * 60 * 1000, "Tầm Bảo Đan: +20% vật phẩm quý", "29");
-        buffApplied = "💎 +20% tỷ lệ rơi vật phẩm quý (24h)";
+        buffApplied = "💎 +20% tỷ lệ rơi vật phẩm quý lần bí cảnh tới (dùng 1 lần, hết hạn sau 24h)";
         break;
 
       // ── 30: Bùa Tốc Hành ─────────────────────────────────────────────
@@ -6939,7 +7096,7 @@ async function handleUse(api, message, p, senderId, sub2, sub3) {
 
       // ── 33: Thẻ Tốc Độ ───────────────────────────────────────────────
       case "33":
-        applyBuff(p, "exp_multiplier", 2, 24 * 60 * 60 * 1000, "Thẻ Tốc Độ: x2 EXP");
+        applyBuffNoStack(p, "exp_multiplier", 2, 24 * 60 * 60 * 1000, "Thẻ Tốc Độ: x2 EXP", "33");
         buffApplied = "🃏 x2 EXP tu luyện (24 giờ)";
         break;
 
@@ -6958,13 +7115,13 @@ async function handleUse(api, message, p, senderId, sub2, sub3) {
       // ── 37: Thần Hành Đan ─────────────────────────────────────────────
       case "37":
         applyBuffNoStack(p, "secret_speed_multiplier", 2, 24 * 60 * 60 * 1000, "Thần Hành Đan: x2 tốc độ bí cảnh", "37");
-        buffApplied = "🏃 x2 tốc độ thám hiểm Bí Cảnh lần tới (24h)";
+        buffApplied = "🏃 x2 tốc độ thám hiểm cho lần Bí Cảnh tới (dùng 1 lần, hết hạn sau 24h)";
         break;
 
       // ── 38: Dẫn Hồn Hương ────────────────────────────────────────────
       case "38":
         applyBuffNoStack(p, "secret_boss_attract", 2, 24 * 60 * 60 * 1000, "Dẫn Hồn Hương: x2 sự kiện đặc biệt", "38");
-        buffApplied = "🕯️ x2 tỷ lệ sự kiện đặc biệt/gặp Boss trong Bí Cảnh (24h)";
+        buffApplied = "🕯️ x2 tỷ lệ sự kiện đặc biệt/gặp Boss lần Bí Cảnh tới (dùng 1 lần, hết hạn sau 24h)";
         break;
 
       // ── 39: Hàu Sữa Đại Bổ ──────────────────────────────────────────
@@ -7091,7 +7248,7 @@ async function handleDp(api, message, p, senderId) {
   if (p.trongThuongUntil && p.trongThuongUntil <= now) p.trongThuongUntil = 0;
 
   if (p.majorRealm >= getMaxMajorRealm(p.daotam) && p.minorRealm >= MAX_MINOR_REALM) {
-    return api.sendMessage({ msg: `🌟 Bạn đã đạt cảnh giới tối cao!`, quote: message, ttl: 15000 }, message.threadId, message.type);
+    return api.sendMessage({ msg: `🌟 Anh đã đạt cảnh giới tối cao!`, quote: message, ttl: 15000 }, message.threadId, message.type);
   }
 
   if (!p.dpAuto) {
@@ -7256,11 +7413,11 @@ function getAvailableRealms(player) {
 
 async function enterSecretRealm(api, message, p, senderId, dungeon) {
   if (p.inSecretRealm) {
-    return api.sendMessage({ msg: "❌ Bạn đang ở trong Bí Cảnh rồi! Dùng `tl bc ve` để về.", quote: message, ttl: 15000 }, message.threadId, message.type);
+    return api.sendMessage({ msg: "❌ Anh đang ở trong Bí Cảnh rồi! Dùng `tl bc ve` để về.", quote: message, ttl: 15000 }, message.threadId, message.type);
   }
 
   if (p.beguan && p.beguan.startedAt) {
-    return api.sendMessage({ msg: `❌ Bạn đang bế quan! Dùng ${getGlobalPrefix()}tl stop để thu hoạch trước khi vào bí cảnh.`, quote: message, ttl: 15000 }, message.threadId, message.type);
+    return api.sendMessage({ msg: `❌ Anh đang bế quan! Dùng ${getGlobalPrefix()}tl stop để thu hoạch trước khi vào bí cảnh.`, quote: message, ttl: 15000 }, message.threadId, message.type);
   }
 
   const stamina = p.stamina ?? 0;
@@ -7299,7 +7456,7 @@ async function enterSecretRealm(api, message, p, senderId, dungeon) {
 async function handleBcList(api, message, p, senderId, pageStr) {
   const allAvailable = getAvailableRealms(p);
   if (allAvailable.length === 0) {
-    return api.sendMessage({ msg: "❌ Chưa có bí cảnh nào phù hợp với cảnh giới của bạn!", quote: message, ttl: 15000 }, message.threadId, message.type);
+    return api.sendMessage({ msg: "❌ Chưa có bí cảnh nào phù hợp với cảnh giới của anh!", quote: message, ttl: 15000 }, message.threadId, message.type);
   }
 
   const pageSize = 5;
@@ -7331,7 +7488,7 @@ ${lines.join("\n━━━━━━━━━━━━━━━━\n")}
 async function handleBcDi(api, message, p, senderId) {
   const available = getAvailableRealms(p);
   if (available.length === 0) {
-    return api.sendMessage({ msg: "❌ Chưa có bí cảnh phù hợp với cảnh giới của bạn!", quote: message, ttl: 15000 }, message.threadId, message.type);
+    return api.sendMessage({ msg: "❌ Chưa có bí cảnh phù hợp với cảnh giới của anh!", quote: message, ttl: 15000 }, message.threadId, message.type);
   }
   const best = available.reduce((a, b) => a.requiredRealm > b.requiredRealm ? a : b);
   return enterSecretRealm(api, message, p, senderId, best);
@@ -7347,7 +7504,7 @@ async function handleBcGo(api, message, p, senderId, index) {
 
 async function handleBcVe(api, message, p, senderId) {
   if (!p.inSecretRealm) {
-    return api.sendMessage({ msg: "❌ Bạn chưa vào Bí Cảnh! Dùng `tl bc di` để tiến vào.", quote: message, ttl: 15000 }, message.threadId, message.type);
+    return api.sendMessage({ msg: "❌ Anh chưa vào Bí Cảnh! Dùng `tl bc di` để tiến vào.", quote: message, ttl: 15000 }, message.threadId, message.type);
   }
 
   const enteredAt = p.secretRealmEnteredAt;
@@ -7459,6 +7616,9 @@ async function handleBcVe(api, message, p, senderId) {
   consumeBuff(p, "secret_boss_attract");
   consumeBuff(p, "secret_loot_boost_pct");
   consumeBuff(p, "secret_dmg_reduction_pct");
+  // Đan EXP dùng 1 lần cho bí cảnh lần tới: 2 (+20%) & 28 (+25%). Đan 33 (exp_multiplier) giữ 24h nên không xóa.
+  consumeBuffSrc(p, "exp_boost_pct", "2");
+  consumeBuff(p, "secret_exp_boost_pct");
 
   p.exp = (p.exp || 0) + expGainedFinal + specialExp;
   p.spiritStones = (p.spiritStones || 0) + stonesGained;
@@ -7530,7 +7690,7 @@ async function handlePkChallenge(api, message, p, senderId, sub2) {
   }
 
   if (p.beguan && p.beguan.startedAt) {
-    return api.sendMessage({ msg: `❌ Bạn đang bế quan! Dùng ${getGlobalPrefix()}tl stop để thu hoạch trước khi PK.`, quote: message, ttl: 15000 }, message.threadId, message.type);
+    return api.sendMessage({ msg: `❌ Anh đang bế quan! Dùng ${getGlobalPrefix()}tl stop để thu hoạch trước khi PK.`, quote: message, ttl: 15000 }, message.threadId, message.type);
   }
 
   const targetPlayer = getPlayer(targetId);
@@ -7540,7 +7700,7 @@ async function handlePkChallenge(api, message, p, senderId, sub2) {
 
   const key = `${senderId}_${targetId}`;
   if (pendingPk[senderId]) {
-    return api.sendMessage({ msg: "⚠️ Bạn đang có thách đấu chưa được hồi đáp!", quote: message, ttl: 15000 }, message.threadId, message.type);
+    return api.sendMessage({ msg: "⚠️ Anh đang có thách đấu chưa được hồi đáp!", quote: message, ttl: 15000 }, message.threadId, message.type);
   }
 
   const cStats = calcStats(p);
@@ -7578,7 +7738,7 @@ async function handlePkAccept(api, message, p, senderId) {
   }
 
   if (p.beguan && p.beguan.startedAt) {
-    return api.sendMessage({ msg: `❌ Bạn đang bế quan! Dùng ${getGlobalPrefix()}tl stop để thu hoạch trước khi PK.`, quote: message, ttl: 15000 }, message.threadId, message.type);
+    return api.sendMessage({ msg: `❌ Anh đang bế quan! Dùng ${getGlobalPrefix()}tl stop để thu hoạch trước khi PK.`, quote: message, ttl: 15000 }, message.threadId, message.type);
   }
 
   const challengerPlayer = getPlayer(challengerId);
@@ -7643,6 +7803,68 @@ async function handlePkAccept(api, message, p, senderId) {
     return null;
   };
 
+  // ── Cải Tử Hoàn Sinh (id 200): 3% hồi sinh 100% máu, 1 lần/trận ──
+  const CAI_TU_ID = "200";
+  const CAI_TU_REVIVE_CHANCE = CONGPHA.find(c => c.id === CAI_TU_ID)?.reviveChance ?? 3;
+  const CAI_TU_REVIVE_HP_PCT = CONGPHA.find(c => c.id === CAI_TU_ID)?.reviveHpPct ?? 100;
+  const cHasCaiTu = hasLearned(challengerPlayer, CAI_TU_ID);
+  const tHasCaiTu = hasLearned(p, CAI_TU_ID);
+  const aHasCaiTu = attacker === challengerId ? cHasCaiTu : tHasCaiTu;
+  const dHasCaiTu = defender === challengerId ? cHasCaiTu : tHasCaiTu;
+  let aCaiTuUsed = false, dCaiTuUsed = false;
+  const attemptCaiTuRevive = (sideIsA, name, turnLines) => {
+    const has = sideIsA ? aHasCaiTu : dHasCaiTu;
+    if (!has) return null;
+    if (sideIsA) {
+      if (aCaiTuUsed) return null;
+      aCaiTuUsed = true;
+    } else {
+      if (dCaiTuUsed) return null;
+      dCaiTuUsed = true;
+    }
+    const maxHp = sideIsA ? aStats.hp : dStats.hp;
+    if (Math.random() * 100 < CAI_TU_REVIVE_CHANCE) {
+      const revivedHp = Math.max(1, Math.floor(maxHp * CAI_TU_REVIVE_HP_PCT / 100));
+      turnLines.push(`💫 [CẢI TỬ HOÀN SINH] ${name} đã gục ngã... nhưng nghịch thiên cải mệnh — HỒI SINH với ${formatBig(revivedHp)} HP! (cơ hội duy nhất đã dùng)`);
+      return revivedHp;
+    }
+    turnLines.push(`💫 [Cải Tử Hoàn Sinh] đang cố bảo vệ ${name} nhưng thất bại! (cơ hội duy nhất đã dùng)`);
+    return null;
+  };
+  const attemptAnyRevive = (sideIsA, name, turnLines) => {
+    const rv = attemptRevive(sideIsA, name, turnLines);
+    if (rv != null) return rv;
+    return attemptCaiTuRevive(sideIsA, name, turnLines);
+  };
+  if (cHasCaiTu) ptIntro += `💫 ${challengerName} mang [Cải Tử Hoàn Sinh] (3% hồi sinh 100% HP khi gục ngã)\n`;
+  if (tHasCaiTu) ptIntro += `💫 ${targetName} mang [Cải Tử Hoàn Sinh] (3% hồi sinh 100% HP khi gục ngã)\n`;
+  if (cHasCaiTu || tHasCaiTu) ptIntro += "\n";
+
+  // ── VONG HỒN (Hỗn Độn Táng Thiên Quan): né đòn kết liễu 1 lần/trận ──
+  const VONG_HON_PB_ID = "pb_hondon_tangthienquan";
+  const cHasVongHon = challengerPlayer.equippedPhapBao === VONG_HON_PB_ID;
+  const tHasVongHon = p.equippedPhapBao === VONG_HON_PB_ID;
+  const aHasVongHon = attacker === challengerId ? cHasVongHon : tHasVongHon;
+  const dHasVongHon = defender === challengerId ? cHasVongHon : tHasVongHon;
+  let aVongHonUsed = false, dVongHonUsed = false;
+  const tryVongHon = (sideIsA, incomingDmg, curHp, name, turnLines) => {
+    const has = sideIsA ? aHasVongHon : dHasVongHon;
+    if (!has) return false;
+    if (sideIsA) {
+      if (aVongHonUsed) return false;
+    } else {
+      if (dVongHonUsed) return false;
+    }
+    if (incomingDmg < curHp) return false;
+    if (sideIsA) aVongHonUsed = true;
+    else dVongHonUsed = true;
+    turnLines.push(`👻 [VONG HỒN] ${name} thân xác tan vỡ... nhưng ⚰️ Hỗn Độn Táng Thiên Quan hóa thành vong hồn — NÉ 100% đòn kết liễu này! (1 lần/trận đã dùng)`);
+    return true;
+  };
+  if (cHasVongHon) ptIntro += `⚰️ ${challengerName} mang [Hỗn Độn Táng Thiên Quan] (Vong Hồn: né đòn kết liễu 1 lần/trận)\n`;
+  if (tHasVongHon) ptIntro += `⚰️ ${targetName} mang [Hỗn Độn Táng Thiên Quan] (Vong Hồn: né đòn kết liễu 1 lần/trận)\n`;
+  if (cHasVongHon || tHasVongHon) ptIntro += "\n";
+
   // ── Pháp Tắc: câu thoại khi ra đòn kết liễu ──
   const PT_KILL_QUOTES = {
     thoigian: (name) => `⏳ [THỜI GIAN] ${name}: "Sinh mệnh vĩnh hằng — thọ nguyên đặt tới điểm kết thúc!"`,
@@ -7706,12 +7928,16 @@ async function handlePkAccept(api, message, p, senderId) {
     // ── Burn Hỏa Diệt Thế (thiêu đốt mỗi hiệp) ──
     if (burnOnD) {
       const burnTick = Math.max(1, Math.floor(dStats.hp * 0.01));
+      if (tryVongHon(false, burnTick, hpD, defenderName, turnLines)) {
+        // Vong Hồn né burn kết liễu, không mất HP
+      } else {
       hpD = Math.max(0, hpD - burnTick);
       totalDmgA += burnTick;
       turnLines.push(`🔥 [Hỏa Diệt Thế] ${defenderName} bị thiêu đốt mất ${formatBig(burnTick)} HP (1% máu tối đa)!`);
       if (hpD <= 0) {
-        const rv = attemptRevive(false, defenderName, turnLines);
+        const rv = attemptAnyRevive(false, defenderName, turnLines);
         if (rv != null) hpD = rv;
+      }
       }
       if (hpD <= 0) {
         const roundBlock = `--- Hiệp ${turn} ---\n${turnLines.join("\n")}\n\n`;
@@ -7722,12 +7948,15 @@ async function handlePkAccept(api, message, p, senderId) {
     }
     if (burnOnA) {
       const burnTick = Math.max(1, Math.floor(aStats.hp * 0.01));
+      if (tryVongHon(true, burnTick, hpA, attackerName, turnLines)) {
+      } else {
       hpA = Math.max(0, hpA - burnTick);
       totalDmgD += burnTick;
       turnLines.push(`🔥 [Hỏa Diệt Thế] ${attackerName} bị thiêu đốt mất ${formatBig(burnTick)} HP (1% máu tối đa)!`);
       if (hpA <= 0) {
-        const rv = attemptRevive(true, attackerName, turnLines);
+        const rv = attemptAnyRevive(true, attackerName, turnLines);
         if (rv != null) hpA = rv;
+      }
       }
       if (hpA <= 0) {
         const roundBlock = `--- Hiệp ${turn} ---\n${turnLines.join("\n")}\n\n`;
@@ -7742,21 +7971,29 @@ async function handlePkAccept(api, message, p, senderId) {
       aSkillUsed = true;
       if (aTech === "phong_thuat") {
         const furyDmg = Math.floor(aStats.base.atk * 0.5);
-        hpD = Math.max(0, hpD - furyDmg);
-        totalDmgA += furyDmg;
         dodgeRedD = Math.min(100, dodgeRedD + 30);
         dodgeBoostA = 50;
+        if (tryVongHon(false, furyDmg, hpD, defenderName, turnLines)) {
+          turnLines.push(`🌪️ [PHONG CUỒNG NỘ] ${attackerName} tung đòn nhưng ${defenderName} đã hóa vong hồn nên vô hiệu! (vẫn bị giảm né)`);
+        } else {
+        hpD = Math.max(0, hpD - furyDmg);
+        totalDmgA += furyDmg;
         turnLines.push(`🌪️ [PHONG CUỒNG NỘ] ${attackerName} bùng nổ phong khí công kích ${defenderName}: ${formatBig(furyDmg)} ST (không thể crit)! Giảm 30% hiệu quả né của ${defenderName}, bản thân +50% né trong lượt tấn công tới của địch.`);
+        }
       } else if (aTech === "hoa_thuat") {
         healRedD = Math.min(100, healRedD + 10);
         burnOnD = true;
         turnLines.push(`🔥 [HỎA DIỆT THẾ] ${attackerName} phóng hỏa diệt thế! Giảm 10% hiệu quả hồi máu của ${defenderName}, thiêu đốt ${defenderName} 1% máu tối đa mỗi hiệp, bản thân +5% sát thương trong trận.`);
       } else if (aTech === "thien_loi") {
         const thunderDmg = Math.floor(dStats.hp * 0.30);
+        if (tryVongHon(false, thunderDmg, hpD, defenderName, turnLines)) {
+          lifeRedD = Math.min(100, lifeRedD + 20);
+        } else {
         hpD = Math.max(0, hpD - thunderDmg);
         totalDmgA += thunderDmg;
         lifeRedD = Math.min(100, lifeRedD + 20);
         turnLines.push(`⚡ [THIÊN LÔI GIÁNG] ${attackerName} giáng thiên lôi đánh trúng ${defenderName}: ${formatBig(thunderDmg)} ST (30% máu tối đa)! Giảm 20% hiệu quả hút máu của ${defenderName} trong trận.`);
+        }
       }
     }
     if (hpD > 0) {
@@ -7779,14 +8016,21 @@ async function handlePkAccept(api, message, p, senderId) {
         if (dStats.maxDmgPct > 0) {
           finalDmg = Math.min(finalDmg, Math.floor(dStats.hp * dStats.maxDmgPct / 100));
         }
+        if (tryVongHon(false, finalDmg, hpD, defenderName, turnLines)) {
+          // Vong Hồn né toàn bộ đòn kết liễu: không mất HP, không phản, không hút máu
+        } else {
         hpD = Math.max(0, hpD - finalDmg);
         totalDmgA += finalDmg;
         const reflectPct = dStats.reflect || 0;
         if (reflectPct > 0) {
           const reflectDmg = Math.floor(finalDmg * reflectPct / 100);
+          if (tryVongHon(true, reflectDmg, hpA, attackerName, turnLines)) {
+            // attacker hóa vong né phản kết liễu
+          } else {
           hpA = Math.max(0, hpA - reflectDmg);
           totalDmgD += reflectDmg;
           turnLines.push(`🛡️ [Phản Đòn] ${defenderName} phản lại ${formatBig(reflectDmg)} HP`);
+          }
         }
         const leech = Math.floor(finalDmg * aStats.lifesteal * (1 - healRedA / 100) * (1 - lifeRedA / 100) / 100);
         hpA = Math.min(aStats.hp, hpA + leech);
@@ -7794,6 +8038,7 @@ async function handlePkAccept(api, message, p, senderId) {
         turnLines.push(isCrit
           ? `⚡ [CHÍ MẠNG] ${attackerName} -> ${defenderName}: ${formatBig(finalDmg)} ⚡${leechNote}`
           : `⚔️ ${attackerName} -> ${defenderName}: ${formatBig(finalDmg)}${leechNote}`);
+        }
       }
     }
     dodgeBoostD = 0;
@@ -7803,7 +8048,7 @@ async function handlePkAccept(api, message, p, senderId) {
       if (atkTitle === "hoan_vu_chi_cao") {
         turnLines.push(`🌌 [HOÀN VŨ CHÍ CAO] ${attackerName}: "Pháp tắc dòng thời không nhấn chìm ngươi mãi mãi chìm vào vô cực!"`);
       }
-      const rv = attemptRevive(false, defenderName, turnLines);
+      const rv = attemptAnyRevive(false, defenderName, turnLines);
       if (rv != null) hpD = rv;
     }
     if (hpA <= 0 && dKillLine) turnLines.push(dKillLine);
@@ -7814,7 +8059,7 @@ async function handlePkAccept(api, message, p, senderId) {
       }
     }
     if (hpA <= 0) {
-      const rv = attemptRevive(true, attackerName, turnLines);
+      const rv = attemptAnyRevive(true, attackerName, turnLines);
       if (rv != null) hpA = rv;
     }
     if (hpD <= 0 || hpA <= 0) {
@@ -7829,21 +8074,29 @@ async function handlePkAccept(api, message, p, senderId) {
       dSkillUsed = true;
       if (dTech === "phong_thuat") {
         const furyDmg = Math.floor(dStats.base.atk * 0.5);
-        hpA = Math.max(0, hpA - furyDmg);
-        totalDmgD += furyDmg;
         dodgeRedA = Math.min(100, dodgeRedA + 30);
         dodgeBoostD = 50;
+        if (tryVongHon(true, furyDmg, hpA, attackerName, turnLines)) {
+          turnLines.push(`🌪️ [PHONG CUỒNG NỘ] ${defenderName} tung đòn nhưng ${attackerName} đã hóa vong hồn nên vô hiệu! (vẫn bị giảm né)`);
+        } else {
+        hpA = Math.max(0, hpA - furyDmg);
+        totalDmgD += furyDmg;
         turnLines.push(`🌪️ [PHONG CUỒNG NỘ] ${defenderName} bùng nổ phong khí công kích ${attackerName}: ${formatBig(furyDmg)} ST (không thể crit)! Giảm 30% hiệu quả né của ${attackerName}, bản thân +50% né trong lượt tấn công tới của địch.`);
+        }
       } else if (dTech === "hoa_thuat") {
         healRedA = Math.min(100, healRedA + 10);
         burnOnA = true;
         turnLines.push(`🔥 [HỎA DIỆT THẾ] ${defenderName} phóng hỏa diệt thế! Giảm 10% hiệu quả hồi máu của ${attackerName}, thiêu đốt ${attackerName} 1% máu tối đa mỗi hiệp, bản thân +5% sát thương trong trận.`);
       } else if (dTech === "thien_loi") {
         const thunderDmg = Math.floor(aStats.hp * 0.30);
+        if (tryVongHon(true, thunderDmg, hpA, attackerName, turnLines)) {
+          lifeRedA = Math.min(100, lifeRedA + 20);
+        } else {
         hpA = Math.max(0, hpA - thunderDmg);
         totalDmgD += thunderDmg;
         lifeRedA = Math.min(100, lifeRedA + 20);
         turnLines.push(`⚡ [THIÊN LÔI GIÁNG] ${defenderName} giáng thiên lôi đánh trúng ${attackerName}: ${formatBig(thunderDmg)} ST (30% máu tối đa)! Giảm 20% hiệu quả hút máu của ${attackerName} trong trận.`);
+        }
       }
     }
     if (hpA > 0) {
@@ -7866,14 +8119,19 @@ async function handlePkAccept(api, message, p, senderId) {
         if (aStats.maxDmgPct > 0) {
           finalDmg2 = Math.min(finalDmg2, Math.floor(aStats.hp * aStats.maxDmgPct / 100));
         }
+        if (tryVongHon(true, finalDmg2, hpA, attackerName, turnLines)) {
+        } else {
         hpA = Math.max(0, hpA - finalDmg2);
         totalDmgD += finalDmg2;
         const reflectPct2 = aStats.reflect || 0;
         if (reflectPct2 > 0) {
           const reflectDmg2 = Math.floor(finalDmg2 * reflectPct2 / 100);
+          if (tryVongHon(false, reflectDmg2, hpD, defenderName, turnLines)) {
+          } else {
           hpD = Math.max(0, hpD - reflectDmg2);
           totalDmgA += reflectDmg2;
           turnLines.push(`🛡️ [Phản Đòn] ${attackerName} phản lại ${formatBig(reflectDmg2)} HP`);
+          }
         }
         const leech2 = Math.floor(finalDmg2 * dStats.lifesteal * (1 - healRedD / 100) * (1 - lifeRedD / 100) / 100);
         hpD = Math.min(dStats.hp, hpD + leech2);
@@ -7881,16 +8139,17 @@ async function handlePkAccept(api, message, p, senderId) {
         turnLines.push(isCrit2
           ? `⚡ [CHÍ MẠNG] ${defenderName} -> ${attackerName}: ${formatBig(finalDmg2)} ⚡${leechNote2}`
           : `⚔️ ${defenderName} -> ${attackerName}: ${formatBig(finalDmg2)}${leechNote2}`);
+        }
       }
     }
     dodgeBoostA = 0;
     if (hpA <= 0 && dKillLine) turnLines.push(dKillLine);
     if (hpA <= 0) {
-      const rv = attemptRevive(true, attackerName, turnLines);
+      const rv = attemptAnyRevive(true, attackerName, turnLines);
       if (rv != null) hpA = rv;
     }
     if (hpD <= 0) {
-      const rv = attemptRevive(false, defenderName, turnLines);
+      const rv = attemptAnyRevive(false, defenderName, turnLines);
       if (rv != null) hpD = rv;
     }
     if (hpA <= 0 || hpD <= 0) {
@@ -7967,9 +8226,9 @@ function applyPhapTacPkStats(myStats, foeStats, eff) {
 async function handlePhapTac(api, message, p, senderId, sub2, sub3) {
   const prefix = getGlobalPrefix();
 
-  if (sub2 === "nangcap" || sub2 === "up" || sub2 === "nang") {
+  if (String(sub2||"").toLowerCase() === "nangcap" || String(sub2||"").toLowerCase() === "up" || String(sub2||"").toLowerCase() === "nang") {
     if (!p.phapTacPath || !PHAPTAC_PATHS[p.phapTacPath]) {
-      return api.sendMessage({ msg: `❌ Bạn chưa chọn đường pháp tắc! Dùng ${prefix}tl phaptac để xem chi tiết.`, quote: message, ttl: 15000 }, message.threadId, message.type);
+      return api.sendMessage({ msg: `❌ Anh chưa chọn đường pháp tắc! Dùng ${prefix}tl phaptac để xem chi tiết.`, quote: message, ttl: 15000 }, message.threadId, message.type);
     }
     const cfg = PHAPTAC_PATHS[p.phapTacPath];
     const lv = p.phapTacLevel || 1;
@@ -7987,7 +8246,7 @@ async function handlePhapTac(api, message, p, senderId, sub2, sub3) {
 ━━━━━━━━━━━━━━━━
 ${cfg.emoji} ${cfg.name} Lv.${lv} → Lv.${lv + 1}
 🔑 Yêu cầu: đạt ${reqName} (cảnh ${reqRealm})
-📍 Cảnh giới của bạn: ${getRealmDisplayFull(p)}`,
+📍 Cảnh giới của anh: ${getRealmDisplayFull(p)}`,
         quote: message, ttl: 15000,
       }, message.threadId, message.type);
     }
@@ -8017,7 +8276,7 @@ ${nextLine}`,
     }, message.threadId, message.type);
   }
 
-  if (sub2 === "tuluyen" || sub2 === "tu" || sub2 === "hoc") {
+  if (String(sub2||"").toLowerCase() === "tuluyen" || String(sub2||"").toLowerCase() === "tu" || String(sub2||"").toLowerCase() === "hoc") {
     const key = (sub3 || "").toLowerCase().trim();
     const cfg = PHAPTAC_PATHS[key];
     if (!cfg) {
@@ -8027,7 +8286,7 @@ ${nextLine}`,
     if (p.phapTacPath) {
       const cur = PHAPTAC_PATHS[p.phapTacPath];
       return api.sendMessage({
-        msg: `❌ Bạn đã tu luyện ${cur.emoji} ${cur.name} rồi! Đạo tâm pháp tắc không thể đổi — mỗi người chỉ chọn 1 đường duy nhất.`,
+        msg: `❌ Anh đã tu luyện ${cur.emoji} ${cur.name} rồi! Đạo tâm pháp tắc không thể đổi — mỗi người chỉ chọn 1 đường duy nhất.`,
         quote: message, ttl: 15000,
       }, message.threadId, message.type);
     }
@@ -8036,7 +8295,7 @@ ${nextLine}`,
       return api.sendMessage({
         msg: `🔒 PHÁP TẮC CHƯA MỞ!
 ━━━━━━━━━━━━━━━━
-📍 Cảnh giới của bạn: ${getRealmDisplayFull(p)}
+📍 Cảnh giới của anh: ${getRealmDisplayFull(p)}
 🔑 Yêu cầu: đạt ${reqName} (cảnh 30) mới cảm ngộ được luật tắc thiên địa.`,
         quote: message, ttl: 15000,
       }, message.threadId, message.type);
@@ -8085,9 +8344,9 @@ ${upgradeLine}
 ⚡ Hiệu ứng hiện tại: ${describePhapTacEff(eff) || "Chưa có hiệu ứng (chân ý chưa khai mở)"}`;
   } else {
     statusBlock = `━━━━━━━━━━━━━━━━
-❔ Bạn chưa chọn đường pháp tắc.
+❔ Anh chưa chọn đường pháp tắc.
 🔑 Yêu cầu: cảnh giới 30 (${getRealmDisplay(PHAPTAC_REQUIRED_REALM, 1, p.daotam)}) trở lên.
-📍 Cảnh giới của bạn: ${getRealmDisplayFull(p)}`;
+📍 Cảnh giới của anh: ${getRealmDisplayFull(p)}`;
   }
 
   const msg = `🌀 PHÁP TẮC TU LUYỆN
@@ -8219,7 +8478,7 @@ async function handleLixi(api, message, p, senderId, sub2, sub3) {
 
     if (packet.claimed[senderId]) {
       return api.sendMessage({
-        msg: `⚠️ Bạn đã hớt lì xì này rồi! Nhận được 💎 ${formatNumber(packet.claimed[senderId])} LT.`,
+        msg: `⚠️ Anh đã hớt lì xì này rồi! Nhận được 💎 ${formatNumber(packet.claimed[senderId])} LT.`,
         quote: message, ttl: 15000,
       }, threadId, message.type);
     }
@@ -8393,7 +8652,7 @@ async function handleVieng(api, message, p, senderId, sub2) {
     return api.sendMessage({ msg: `${dao.emoji} ${dao.label}: Chưa có ai xưng bá, không thể viếng!\n💡 Cần có người đạt tối thiểu cảnh ${STATUE_MIN_REALM} của đạo này.`, quote: message, ttl: 15000 }, message.threadId, message.type);
   }
   if (p.lastViengDate === getDateKey()) {
-    return api.sendMessage({ msg: `🙏 Hôm nay bạn đã viếng rồi!\n💡 Mỗi ngày chỉ được viếng 1 lần. Quay lại sau 00:00 nhé.`, quote: message, ttl: 15000 }, message.threadId, message.type);
+    return api.sendMessage({ msg: `🙏 Hôm nay anh đã viếng rồi!\n💡 Mỗi ngày chỉ được viếng 1 lần. Quay lại sau 00:00 nhé.`, quote: message, ttl: 15000 }, message.threadId, message.type);
   }
   if ((p.spiritStones || 0) < VIENG_FEE) {
     return api.sendMessage({ msg: `❌ Không đủ Linh Thạch! Viếng tượng cần ${formatNumber(VIENG_FEE)} LT, bạn có ${formatNumber(p.spiritStones || 0)} LT.`, quote: message, ttl: 15000 }, message.threadId, message.type);
@@ -8447,7 +8706,7 @@ async function handleVieng(api, message, p, senderId, sub2) {
 
 async function handleTubao(api, message, p, senderId) {
   if (p.majorRealm === 1 && p.minorRealm === 1) {
-    return api.sendMessage({ msg: "⚠️ Bạn đang ở cảnh giới khởi đầu rồi!", quote: message, ttl: 15000 }, message.threadId, message.type);
+    return api.sendMessage({ msg: "⚠️ Anh đang ở cảnh giới khởi đầu rồi!", quote: message, ttl: 15000 }, message.threadId, message.type);
   }
 
   const oldRealm = getRealmDisplay(p.majorRealm, p.minorRealm, p.daotam);
@@ -8560,6 +8819,245 @@ async function handlePhiThang(api, message, p, senderId) {
   await api.sendMessage({ msg, quote: message, ttl: 60000 }, message.threadId, message.type);
 }
 
+// ── LUÂN HỒI ────────────────────────────────────────────────
+// .tl luanhoi → xem preview + yêu cầu xác nhận
+// .tl luanhoi xacnhan → nén TOÀN BỘ stats hiện tại vào kho, reset về Luyện Khí
+// .tl luanhoi info → xem kho phong ấn / đã giải phong
+// .tl giaiphong → ném toàn bộ kho ra ngoài, cộng thẳng vào stats hiện tại
+// Tối đa 100 kiếp. Kho cộng dồn tuyệt đối: 2 kiếp 50 + 50 = 100.
+// Xóa sạch túi đồ + Linh Thạch + Pháp tắc khi luân hồi (chống bug mặc lại đồ cũ nhân 2 stats).
+const LUANHOI_MAX = 100;
+const LUANHOI_CONFIRM_MS = 60 * 1000;
+
+function ensureLuanhoi(p) {
+  if (typeof p.luanhoiCount !== "number") p.luanhoiCount = 0;
+  if (!p.luanhoiSealed || typeof p.luanhoiSealed !== "object") p.luanhoiSealed = { atk: 0, hp: 0, spd: 0, def: 0 };
+  if (!p.luanhoiReleased || typeof p.luanhoiReleased !== "object") p.luanhoiReleased = { atk: 0, hp: 0, spd: 0, def: 0 };
+  if (!Array.isArray(p.luanhoiHistory)) p.luanhoiHistory = [];
+  if (typeof p.luanhoiPendingAt !== "number") p.luanhoiPendingAt = 0;
+  if (typeof p.luanhoiSealedCount !== "number") p.luanhoiSealedCount = 0;
+  for (const k of ["atk", "hp", "spd", "def"]) {
+    if (typeof p.luanhoiSealed[k] !== "number" || !Number.isFinite(p.luanhoiSealed[k])) p.luanhoiSealed[k] = 0;
+    if (typeof p.luanhoiReleased[k] !== "number" || !Number.isFinite(p.luanhoiReleased[k])) p.luanhoiReleased[k] = 0;
+  }
+}
+
+function formatLuanhoiStats(s) {
+  return `⚔️ ATK ${formatBig(s.atk || 0)} | ❤️ HP ${formatBig(s.hp || 0)} | 💨 SPD ${formatBig(s.spd || 0)} | 🛡️ DEF ${formatBig(s.def || 0)}`;
+}
+
+// Tổng stats đang bị phong ấn trong kho (atk+hp+spd+def). Dùng để check
+// kho rỗng ở .tl status và .tl giaiphong.
+function luanhoiSealedTotal(p) {
+  const s = p?.luanhoiSealed || {};
+  return (s.atk || 0) + (s.hp || 0) + (s.spd || 0) + (s.def || 0);
+}
+
+async function handleLuanHoi(api, message, p, senderId, sub2) {
+  const prefix = getGlobalPrefix();
+  ensureLuanhoi(p);
+  const k = String(sub2 || "").toLowerCase();
+
+  if (k === "info" || k === "xem" || k === "history" || k === "lichsu") {
+    const sealed = p.luanhoiSealed;
+    const released = p.luanhoiReleased;
+    const lines = (p.luanhoiHistory || []).slice(-5).map(h => `• Kiếp ${h.kiep}: ${getRealmDisplay(h.majorRealm || 1, h.minorRealm || 1, p.daotam)} — ${formatLuanhoiStats(h.stats)}`);
+    const msg = `🌀 LUÂN HỒI — HỒ SƠ KIẾP SỐ
+━━━━━━━━━━━━━━━━
+🔄 Tổng kiếp đã luân hồi: ${p.luanhoiCount || 0}/${LUANHOI_MAX}
+🔒 Đang phong ấn (${p.luanhoiSealedCount || 0} kiếp trong kho):
+${formatLuanhoiStats(sealed)}
+🔓 Đã giải phong (cộng thẳng vào stats hiện tại):
+${formatLuanhoiStats(released)}
+${lines.length > 0 ? `━━━━━━━━━━━━━━━━\n📜 5 kiếp gần nhất:\n${lines.join("\n")}` : "📜 Chưa có kiếp nào."}
+━━━━━━━━━━━━━━━━
+💡 ${prefix}tl luanhoi — luân hồi kiếp mới
+💡 ${prefix}tl giaiphong — giải phong toàn bộ stats đang bị phong ấn`;
+    return api.sendMessage({ msg, quote: message, ttl: 30000 }, message.threadId, message.type);
+  }
+
+  if (k === "xacnhan" || k === "confirm" || k === "ok" || k === "dongy") {
+    if ((p.luanhoiCount || 0) >= LUANHOI_MAX) {
+      return api.sendMessage({ msg: `❌ Ngươi đã đạt tối đa ${LUANHOI_MAX} kiếp luân hồi! Không thể luân hồi thêm.`, quote: message, ttl: 15000 }, message.threadId, message.type);
+    }
+    if (!p.luanhoiPendingAt || Date.now() - p.luanhoiPendingAt > LUANHOI_CONFIRM_MS) {
+      return api.sendMessage({ msg: `⚠️ Chưa có yêu cầu luân hồi hoặc đã hết hạn!\n💡 Gõ ${prefix}tl luanhoi trước, rồi ${prefix}tl luanhoi xacnhan trong 60 giây.`, quote: message, ttl: 15000 }, message.threadId, message.type);
+    }
+    if (p.beguan?.startedAt) {
+      return api.sendMessage({ msg: "❌ Đang bế quan không thể luân hồi! Hãy stop bế quan trước.", quote: message, ttl: 15000 }, message.threadId, message.type);
+    }
+    if (p.inSecretRealm) {
+      return api.sendMessage({ msg: `❌ Đang ở trong bí cảnh không thể luân hồi! Gõ ${prefix}tl v để rời bí cảnh trước.`, quote: message, ttl: 15000 }, message.threadId, message.type);
+    }
+
+    // Nén TOÀN BỘ stats hiện tại vào kho (gồm cả phần đã giải phong trước đó —
+    // giải phong = stats thực, luân hồi tiếp thì nén gộp luôn, cộng dồn tuyệt đối).
+    const statsFull = calcStats(p);
+    const snapshot = {
+      atk: Math.max(0, Math.floor(statsFull.atk || 0)),
+      hp: Math.max(0, Math.floor(statsFull.hp || 0)),
+      spd: Math.max(0, Math.floor(statsFull.spd || 0)),
+      def: Math.max(0, Math.floor(statsFull.def || 0)),
+    };
+    const oldRealm = getRealmDisplay(p.majorRealm, p.minorRealm, p.daotam);
+    const oldTalent = TALENTS[p.talent] || TALENTS.pham;
+
+    p.luanhoiSealed.atk += snapshot.atk;
+    p.luanhoiSealed.hp += snapshot.hp;
+    p.luanhoiSealed.spd += snapshot.spd;
+    p.luanhoiSealed.def += snapshot.def;
+    // Phần đã giải phong đã nén gộp vào snapshot ở trên → reset về 0 để khi
+    // giaiphong sau khỏi cộng 2 lần.
+    p.luanhoiReleased = { atk: 0, hp: 0, spd: 0, def: 0 };
+    p.luanhoiCount = (p.luanhoiCount || 0) + 1;
+    p.luanhoiSealedCount = (p.luanhoiSealedCount || 0) + 1;
+    (p.luanhoiHistory = p.luanhoiHistory || []).push({
+      kiep: p.luanhoiCount,
+      at: Date.now(),
+      majorRealm: p.majorRealm,
+      minorRealm: p.minorRealm,
+      talent: p.talent,
+      stats: snapshot,
+    });
+    if (p.luanhoiHistory.length > LUANHOI_MAX) p.luanhoiHistory = p.luanhoiHistory.slice(-LUANHOI_MAX);
+    p.luanhoiPendingAt = 0;
+
+    // Reset tu vi về Luyện Khí + roll lại thiên phú / thể chất / linh căn / huyết mạch.
+    const newTalent = rollTalent();
+    const newTalentInfo = TALENTS[newTalent] || TALENTS.pham;
+    p.majorRealm = 1;
+    p.minorRealm = 1;
+    p.exp = 0;
+    p.talent = newTalent;
+    p.theChat = rollTheChat();
+    p.huyetMach = rollHuyetMach();
+    p.linhCan = rollLinhCan();
+    p.ngoTinh = newTalentInfo.ngoBase;
+    p.phucDuyen = newTalentInfo.phucBase;
+    // Tháo toàn bộ trang bị + RESET SẠCH TÚI ĐỒ (.tl bag) để tránh bug:
+    // snapshot phong ấn đã gồm stats đồ đang mặc, nếu giữ inventory thì
+    // kiếp sau mặc lại đồ cũ + giải phong = nhân 2 stats. Nên xóa hết.
+    p.equippedWeapon = null;
+    p.equippedArmor = null;
+    p.equippedPhapBao = null;
+    p.equippedPhapTac = null;
+    p.equippedTitle = null;
+    // Toàn bộ túi đồ: vũ khí / giáp / skill / pháp bảo / đan (kể cả token) / nguyên liệu
+    p.inventory = { weapons: {}, armors: {}, potions: {}, materials: {}, phapTac: {}, phapBao: {} };
+    p.learnedCongPha = [];
+    p.upgradeLevels = {};
+    p.maxStaminaBonus = 0;
+    // Tiền tệ trong túi: Linh Thạch / cốt / hồn / hỏa — xóa hết theo luân hồi
+    p.spiritStones = 0;
+    p.bones = 0;
+    p.soul = 0;
+    p.fire = 0;
+    // Pháp tắc tu luyện: reset đường + cấp về chưa ngộ
+    p.phapTacPath = null;
+    p.phapTacLevel = 0;
+    p.breakthroughBonus = 0;
+    p.currentHp = null;
+    p.inSecretRealm = false;
+    p.secretRealmEnteredAt = null;
+    p.currentSecretRealmId = null;
+    p.beguan = null;
+    p.trongThuongUntil = 0;
+    p.buffs = [];
+    p.towerInjured = false;
+    const naturalMax = 50 + 1 * 20;
+    p.maxStamina = naturalMax + (p.maxStaminaBonus || 0);
+    p.stamina = p.maxStamina;
+    p.lastStaminaRegen = Date.now();
+    savePlayer(senderId);
+
+    const newTheChat = THECHAT.find(t => t.id === p.theChat) || THECHAT[0];
+    const newHuyetMach = HUYETMACH.find(h => h.id === p.huyetMach) || HUYETMACH[0];
+    const newLinhCan = LINH_CAN.find(l => l.id === p.linhCan) || LINH_CAN[0];
+    const msg = `🌀 LUÂN HỒI THÀNH CÔNG — KIẾP THỨ ${p.luanhoiCount}/${LUANHOI_MAX}!
+━━━━━━━━━━━━━━━━
+📍 Kiếp trước: ${oldRealm} (${oldTalent.emoji} ${oldTalent.name})
+🔒 Đã nén kiếp này vào kho (stats hiện tại, gồm cả phần đã giải phong):
+${formatLuanhoiStats(snapshot)}
+🔒 Tổng kho (${p.luanhoiSealedCount || 0} kiếp đang phong ấn):
+${formatLuanhoiStats(p.luanhoiSealed)}
+━━━━━━━━━━━━━━━━
+✨ Kiếp mới: ${getRealmDisplay(1, 1, p.daotam)}
+${newTalentInfo.emoji} Thiên phú: ${newTalentInfo.name} (×${newTalentInfo.multiplier})
+${newTheChat.emoji} Thể chất: ${newTheChat.name}
+${newHuyetMach.emoji} Huyết mạch: ${newHuyetMach.name}
+${newLinhCan.emoji} Linh căn: ${newLinhCan.name} (×${newLinhCan.expMult} EXP)
+🎒 Toàn bộ túi đồ (.tl bag) đã bị xóa sạch (trang bị/đan/nguyên liệu/công pháp/cường hóa).
+💎 Linh Thạch / 🦴 cốt / 👻 hồn / 🔥 hỏa về 0. 🌀 Pháp tắc reset về chưa ngộ.
+━━━━━━━━━━━━━━━━
+💡 Gõ ${prefix}tl giaiphong để giải phong toàn bộ stats đang phong ấn!`;
+    return api.sendMessage({ msg, quote: message, ttl: 60000 }, message.threadId, message.type);
+  }
+
+  // Mặc định: preview + đặt cờ xác nhận 60s.
+  if ((p.luanhoiCount || 0) >= LUANHOI_MAX) {
+    return api.sendMessage({ msg: `❌ Ngươi đã đạt tối đa ${LUANHOI_MAX} kiếp luân hồi!`, quote: message, ttl: 15000 }, message.threadId, message.type);
+  }
+  const statsFull = calcStats(p);
+  const preview = {
+    atk: Math.max(0, Math.floor(statsFull.atk || 0)),
+    hp: Math.max(0, Math.floor(statsFull.hp || 0)),
+    spd: Math.max(0, Math.floor(statsFull.spd || 0)),
+    def: Math.max(0, Math.floor(statsFull.def || 0)),
+  };
+  p.luanhoiPendingAt = Date.now();
+  savePlayer(senderId);
+  const msg = `🌀 LUÂN HỒI — XÁC NHẬN!
+━━━━━━━━━━━━━━━━
+📍 Hiện tại: ${getRealmDisplay(p.majorRealm, p.minorRealm, p.daotam)}
+🔄 Kiếp sắp tới: ${ (p.luanhoiCount || 0) + 1}/${LUANHOI_MAX}
+🔒 Kiếp này sẽ nén vào kho (toàn bộ stats hiện tại, gồm cả phần đã giải phong):
+${formatLuanhoiStats(preview)}
+🔒 Tổng kho sau khi luân hồi (cộng dồn):
+${formatLuanhoiStats({ atk: (p.luanhoiSealed?.atk || 0) + preview.atk, hp: (p.luanhoiSealed?.hp || 0) + preview.hp, spd: (p.luanhoiSealed?.spd || 0) + preview.spd, def: (p.luanhoiSealed?.def || 0) + preview.def })}
+━━━━━━━━━━━━━━━━
+⚠️ Sau luân hồi:
+• Tu vi reset về ${getRealmDisplay(1, 1, p.daotam)}
+• Thiên phú / Thể chất / Linh căn / Huyết mạch roll lại ngẫu nhiên
+• XÓA SẠCH túi đồ (.tl bag): trang bị/skill/pháp bảo/đan/nguyên liệu/công pháp/cường hóa (kể cả token)
+• Linh Thạch / cốt / hồn / hỏa về 0 — Pháp tắc reset về chưa ngộ
+• Donate / Prime / Phi thăng được GIỮ NGUYÊN
+━━━━━━━━━━━━━━━━
+✅ Xác nhận: ${prefix}tl luanhoi xacnhan (trong 60 giây)
+📜 Xem kho: ${prefix}tl luanhoi info`;
+  return api.sendMessage({ msg, quote: message, ttl: 60000 }, message.threadId, message.type);
+}
+
+async function handleGiaiPhong(api, message, p, senderId) {
+  const prefix = getGlobalPrefix();
+  ensureLuanhoi(p);
+  if (luanhoiSealedTotal(p) <= 0) {
+    return api.sendMessage({ msg: `❌ Không có stats nào đang bị phong ấn!\n💡 Gõ ${prefix}tl luanhoi để luân hồi kiếp mới.`, quote: message, ttl: 15000 }, message.threadId, message.type);
+  }
+  const sealed = { ...p.luanhoiSealed };
+  const sealedKiep = (p.luanhoiSealedCount || 0) > 0 ? p.luanhoiSealedCount : (p.luanhoiCount || 0);
+  p.luanhoiReleased.atk = (p.luanhoiReleased.atk || 0) + (sealed.atk || 0);
+  p.luanhoiReleased.hp = (p.luanhoiReleased.hp || 0) + (sealed.hp || 0);
+  p.luanhoiReleased.spd = (p.luanhoiReleased.spd || 0) + (sealed.spd || 0);
+  p.luanhoiReleased.def = (p.luanhoiReleased.def || 0) + (sealed.def || 0);
+  p.luanhoiSealed = { atk: 0, hp: 0, spd: 0, def: 0 };
+  p.luanhoiSealedCount = 0;
+  savePlayer(senderId);
+  const stats = calcStats(p);
+  const msg = `🔓 GIẢI PHONG THÀNH CÔNG!
+━━━━━━━━━━━━━━━━
+🔓 Đã giải phong ${sealedKiep} kiếp trong kho (cộng dồn):
+${formatLuanhoiStats(sealed)}
+━━━━━━━━━━━━━━━━
+🔓 Tổng đã giải phong (cộng thẳng vào stats hiện tại):
+${formatLuanhoiStats(p.luanhoiReleased)}
+━━━━━━━━━━━━━━━━
+📊 Stats hiện tại của ngươi:
+⚔️ ATK: ${formatBig(stats.atk)} | ❤️ HP: ${formatBig(stats.hp)}
+💨 SPD: ${formatBig(stats.spd)} | 🛡️ DEF: ${formatBig(stats.def)}
+💥 Lực Chiến: ${formatNumber(stats.battlePower)}`;
+  return api.sendMessage({ msg, quote: message, ttl: 60000 }, message.threadId, message.type);
+}
+
 function getBossScaleReduction(p) {
   let reduction = 0;
   const weapon = p.equippedWeapon ? WEAPONS.find(w => w.id === p.equippedWeapon) : null;
@@ -8629,7 +9127,7 @@ async function handleTowerStatus(api, message, p, senderId) {
 ━━━━━━━━━━━━━━━━
 ⚔️ Đánh chi tiết 1 tầng: ${prefix}tl thap challenge
 ⚡ Leo tự động: ${prefix}tl thap auto (tốn 100–200 thể lực/tầng, tăng theo tầng)
-💡 Boss vô hiệu DEF & giảm thương của bạn, không hút máu/phản/ST chuẩn, nhưng né rất cao!
+💡 Boss vô hiệu DEF & giảm thương của anh, không hút máu/phản/ST chuẩn, nhưng né rất cao!
 💡 Boss Scaling (giáp THẦN THOẠI, Thất Sát Phù) kìm hãm tốc độ tăng trưởng của boss!
 💡 Đan 36 (Thiên Thiên Bảo Hộ) chặn ST ≤15% HP/đòn | Đan 43 (Đan Tâm Đan) nâng ST đòn trúng lên tối thiểu 1.5% HP Boss`;
   await api.sendMessage({ msg, quote: message, ttl: 30000 }, message.threadId, message.type);
@@ -8750,7 +9248,7 @@ function simulateTowerFight(floor, p) {
       hpP = Math.min(hpPlayer, hpP + leech);
       const leechNote = leech > 0 ? ` (Hút máu: +${formatBig(leech)} HP)` : "";
       if (!hit) {
-        turnLines.push(`💨 Boss né đòn của bạn!`);
+        turnLines.push(`💨 Boss né đòn của anh!`);
       } else if (wasCrit && minDmg > 0 && finalDmg <= minDmg) {
         turnLines.push(`🌀⚡ [ĐAN TÂM CHÍ MẠNG] Bạn -> Boss: ${formatBig(finalDmg)} ⚡${leechNote}`);
       } else if (minDmg > 0 && finalDmg <= minDmg) {
@@ -8839,7 +9337,7 @@ function simulateTowerFight(floor, p) {
       hpP = Math.min(hpPlayer, hpP + leech);
       const leechNote = leech > 0 ? ` (Hút máu: +${formatBig(leech)} HP)` : "";
       if (!hit) {
-        turnLines.push(`💨 Boss né đòn của bạn!`);
+        turnLines.push(`💨 Boss né đòn của anh!`);
       } else if (wasCrit && minDmg > 0 && finalDmg <= minDmg) {
         turnLines.push(`🌀⚡ [ĐAN TÂM CHÍ MẠNG] Bạn -> Boss: ${formatBig(finalDmg)} ⚡${leechNote}`);
       } else if (minDmg > 0 && finalDmg <= minDmg) {
@@ -8877,14 +9375,14 @@ async function handleTowerChallenge(api, message, p, senderId) {
   const prefix = getGlobalPrefix();
   const currentFloor = p.towerFloor || 0;
   if (currentFloor >= TOWER_MAX_FLOOR) {
-    return api.sendMessage({ msg: `🏆 Bạn đã vượt hết ${TOWER_MAX_FLOOR} tầng Thiên Tầng Tháp! Chờ cập nhật thêm tầng mới.`, quote: message, ttl: 15000 }, message.threadId, message.type);
+    return api.sendMessage({ msg: `🏆 Anh đã vượt hết ${TOWER_MAX_FLOOR} tầng Thiên Tầng Tháp! Chờ cập nhật thêm tầng mới.`, quote: message, ttl: 15000 }, message.threadId, message.type);
   }
   if (p.beguan && p.beguan.startedAt) {
-    return api.sendMessage({ msg: `❌ Bạn đang bế quan! Dùng ${getGlobalPrefix()}tl stop để thu hoạch trước khi lên tháp.`, quote: message, ttl: 15000 }, message.threadId, message.type);
+    return api.sendMessage({ msg: `❌ Anh đang bế quan! Dùng ${getGlobalPrefix()}tl stop để thu hoạch trước khi lên tháp.`, quote: message, ttl: 15000 }, message.threadId, message.type);
   }
   if (p.towerInjured) {
     const healHint = p.daotam === "ma" ? "22 (Nghịch Thiên Đan)" : "1 (Huyết Khí Đan) hoặc 24 (Sinh Mệnh Đan)";
-    return api.sendMessage({ msg: `💀 Bạn đang trọng thương vì bị Boss tháp đánh gục!\n💊 Cắn đan ${healHint} để hồi phục rồi mới leo tháp tiếp.`, quote: message, ttl: 15000 }, message.threadId, message.type);
+    return api.sendMessage({ msg: `💀 Anh đang trọng thương vì bị Boss tháp đánh gục!\n💊 Cắn đan ${healHint} để hồi phục rồi mới leo tháp tiếp.`, quote: message, ttl: 15000 }, message.threadId, message.type);
   }
   const floor = currentFloor + 1;
   const staminaCost = getTowerStaminaCost(floor);
@@ -8931,11 +9429,11 @@ ${resultBlock}`;
 async function handleTowerAuto(api, message, p, senderId) {
   const prefix = getGlobalPrefix();
   if (p.beguan && p.beguan.startedAt) {
-    return api.sendMessage({ msg: `❌ Bạn đang bế quan! Dùng ${getGlobalPrefix()}tl stop để thu hoạch trước khi lên tháp.`, quote: message, ttl: 15000 }, message.threadId, message.type);
+    return api.sendMessage({ msg: `❌ Anh đang bế quan! Dùng ${getGlobalPrefix()}tl stop để thu hoạch trước khi lên tháp.`, quote: message, ttl: 15000 }, message.threadId, message.type);
   }
   if (p.towerInjured) {
     const healHint = p.daotam === "ma" ? "22 (Nghịch Thiên Đan)" : "1 (Huyết Khí Đan) hoặc 24 (Sinh Mệnh Đan)";
-    return api.sendMessage({ msg: `💀 Bạn đang trọng thương vì bị Boss tháp đánh gục!\n💊 Cắn đan ${healHint} để hồi phục rồi mới leo tháp tiếp.`, quote: message, ttl: 15000 }, message.threadId, message.type);
+    return api.sendMessage({ msg: `💀 Anh đang trọng thương vì bị Boss tháp đánh gục!\n💊 Cắn đan ${healHint} để hồi phục rồi mới leo tháp tiếp.`, quote: message, ttl: 15000 }, message.threadId, message.type);
   }
   let stamina = p.stamina || 0;
   if (stamina < getTowerStaminaCost((p.towerFloor || 0) + 1)) {
@@ -8944,7 +9442,7 @@ async function handleTowerAuto(api, message, p, senderId) {
 
   let floor = (p.towerFloor || 0) + 1;
   if (floor > TOWER_MAX_FLOOR) {
-    return api.sendMessage({ msg: `🏆 Bạn đã vượt hết ${TOWER_MAX_FLOOR} tầng Thiên Tầng Tháp! Chờ cập nhật thêm tầng mới.`, quote: message, ttl: 15000 }, message.threadId, message.type);
+    return api.sendMessage({ msg: `🏆 Anh đã vượt hết ${TOWER_MAX_FLOOR} tầng Thiên Tầng Tháp! Chờ cập nhật thêm tầng mới.`, quote: message, ttl: 15000 }, message.threadId, message.type);
   }
 
   const logs = [];
@@ -9056,7 +9554,7 @@ function buildTrainBoss(p, stage) {
 async function handleTrain(api, message, p, senderId) {
   const prefix = getGlobalPrefix();
   if (p.beguan && p.beguan.startedAt) {
-    return api.sendMessage({ msg: `❌ Bạn đang bế quan! Dùng ${prefix}tl stop để thu hoạch trước.`, quote: message, ttl: 15000 }, message.threadId, message.type);
+    return api.sendMessage({ msg: `❌ Anh đang bế quan! Dùng ${prefix}tl stop để thu hoạch trước.`, quote: message, ttl: 15000 }, message.threadId, message.type);
   }
   if (p.trongThuongUntil && Date.now() < p.trongThuongUntil) {
     return api.sendMessage({ msg: `❌ Đang trọng thương, không thể chiến đấu!`, quote: message, ttl: 15000 }, message.threadId, message.type);
@@ -9096,7 +9594,7 @@ async function handleTrain(api, message, p, senderId) {
     for (const [who] of seq) {
       if (who === "me" && hpMe > 0 && hpBoss > 0) {
         const res = strike(myStats, bStats, bStats.dodge, bStats.dmgReduction, 0, bStats.hp, false);
-        if (res.dodge) { roundLines.push(`💨 Hiệp ${r}: ${name} né đòn của bạn!`); continue; }
+        if (res.dodge) { roundLines.push(`💨 Hiệp ${r}: ${name} né đòn của anh!`); continue; }
         const leech = Math.floor(res.dmg * myStats.lifesteal / 100);
         hpMe = Math.min(myStats.hp, hpMe + leech);
         hpBoss = Math.max(0, hpBoss - res.dmg);
@@ -9142,7 +9640,7 @@ async function handleTrain(api, message, p, senderId) {
 👹 ${name} — ${bossRealmTxt}
 📊 Boss: ${formatBig(bStats.atk)} ATK | ${formatBig(bStats.hp)} HP | SPD ${formatBig(bStats.spd)} | Né ${bStats.dodge}%
 🚫 Boss không vũ khí/giáp, miễn bạo kích, miễn pháp tắc, vô hiệu DEF & giảm thương — né 80% như boss tháp!
-📈 Stage của bạn: ${stage} → ${won ? stage + 1 : stage}
+📈 Stage của anh: ${stage} → ${won ? stage + 1 : stage}
 ━━━━━━━━━━━━━━━━
 ${shown.join("\n")}${moreLine}
 ━━━━━━━━━━━━━━━━
@@ -9153,7 +9651,7 @@ ${resultBlock}`;
 
 async function handleNhapDao(api, message, p, senderId) {
   if (p.daotam === "chinh") {
-    return api.sendMessage({ msg: "⚡ Bạn đã là Chính Đạo tu sĩ rồi!", quote: message, ttl: 15000 }, message.threadId, message.type);
+    return api.sendMessage({ msg: "⚡ Anh đã là Chính Đạo tu sĩ rồi!", quote: message, ttl: 15000 }, message.threadId, message.type);
   }
   if (p.majorRealm > 1) {
     return api.sendMessage({ msg: `❌ Chỉ ở Luyện Khí trở xuống mới nhập Chính Đạo!\n💡 Dùng ${getGlobalPrefix()}tl tubao để tự bạo về Luyện Khí.`, quote: message, ttl: 15000 }, message.threadId, message.type);
@@ -9179,7 +9677,7 @@ async function handleNhapDao(api, message, p, senderId) {
 
 async function handleNhapMa(api, message, p, senderId) {
   if (p.daotam === "ma") {
-    return api.sendMessage({ msg: "⚫ Bạn đã là Ma Đạo tu sĩ rồi!", quote: message, ttl: 15000 }, message.threadId, message.type);
+    return api.sendMessage({ msg: "⚫ Anh đã là Ma Đạo tu sĩ rồi!", quote: message, ttl: 15000 }, message.threadId, message.type);
   }
 
   if (p.majorRealm > 1) {
@@ -9206,7 +9704,7 @@ async function handleNhapMa(api, message, p, senderId) {
 
 async function handleNhapNho(api, message, p, senderId) {
   if (p.daotam === "nho") {
-    return api.sendMessage({ msg: "🎓 Bạn đã là Nho Đạo tu sĩ rồi!", quote: message, ttl: 15000 }, message.threadId, message.type);
+    return api.sendMessage({ msg: "🎓 Anh đã là Nho Đạo tu sĩ rồi!", quote: message, ttl: 15000 }, message.threadId, message.type);
   }
 
   if (p.majorRealm > 1) {
@@ -9233,7 +9731,7 @@ async function handleNhapNho(api, message, p, senderId) {
 
 async function handleNhapYeu(api, message, p, senderId) {
   if (p.daotam === "yeu") {
-    return api.sendMessage({ msg: "🐾 Bạn đã là Yêu Đạo tu sĩ rồi!", quote: message, ttl: 15000 }, message.threadId, message.type);
+    return api.sendMessage({ msg: "🐾 Anh đã là Yêu Đạo tu sĩ rồi!", quote: message, ttl: 15000 }, message.threadId, message.type);
   }
 
   if (p.majorRealm > 1) {
@@ -9260,7 +9758,7 @@ async function handleNhapYeu(api, message, p, senderId) {
 
 async function handleNhapLo(api, message, p, senderId) {
   if (p.daotam === "lo") {
-    return api.sendMessage({ msg: "🫙 Bạn đã là Lọ Đạo tu sĩ rồi!", quote: message, ttl: 15000 }, message.threadId, message.type);
+    return api.sendMessage({ msg: "🫙 Anh đã là Lọ Đạo tu sĩ rồi!", quote: message, ttl: 15000 }, message.threadId, message.type);
   }
 
   if (p.majorRealm > 1) {
@@ -9288,7 +9786,7 @@ async function handleNhapLo(api, message, p, senderId) {
 
 async function handleNhapQuy(api, message, p, senderId) {
   if (p.daotam === "quy") {
-    return api.sendMessage({ msg: "👻 Bạn đã là Quỷ Đạo tu sĩ rồi!", quote: message, ttl: 15000 }, message.threadId, message.type);
+    return api.sendMessage({ msg: "👻 Anh đã là Quỷ Đạo tu sĩ rồi!", quote: message, ttl: 15000 }, message.threadId, message.type);
   }
 
   if (p.majorRealm > 1) {
@@ -9315,7 +9813,7 @@ async function handleNhapQuy(api, message, p, senderId) {
 
 async function handleNhapPhat(api, message, p, senderId) {
   if (p.daotam === "phat") {
-    return api.sendMessage({ msg: "🪷 Bạn đã là Phật Đạo tu sĩ rồi!", quote: message, ttl: 15000 }, message.threadId, message.type);
+    return api.sendMessage({ msg: "🪷 Anh đã là Phật Đạo tu sĩ rồi!", quote: message, ttl: 15000 }, message.threadId, message.type);
   }
 
   if (p.majorRealm > 1) {
@@ -9348,7 +9846,7 @@ async function handleSet(api, message, p, senderId, sub2, sub3) {
   const targetId = (message.data.mentions?.[0]?.uid || senderId).toString();
   logAdminAction(senderId, "set", `${sub2 || ""}${sub3 ? " " + sub3 : ""}`, targetId);
 
-  if (sub2 === "thienphu") {
+  if (String(sub2||"").toLowerCase() === "thienphu") {
     const talentKeys = Object.keys(TALENTS);
     const idx = parseInt(sub3, 10);
     if (isNaN(idx) || idx < 1 || idx > talentKeys.length) {
@@ -9375,7 +9873,7 @@ async function handleSet(api, message, p, senderId, sub2, sub3) {
     }, threadId, message.type);
   }
 
-  if (sub2 === "tax") {
+  if (String(sub2||"").toLowerCase() === "tax") {
     const value = parseFloat(sub3);
     if (isNaN(value) || value < 0 || value > 100) {
       const prefix = getGlobalPrefix();
@@ -9393,7 +9891,7 @@ async function handleSet(api, message, p, senderId, sub2, sub3) {
     return api.sendMessage({ msg, quote: message, ttl: 30000 }, threadId, message.type);
   }
 
-  if (sub2 === "exp") {
+  if (String(sub2||"").toLowerCase() === "exp") {
     const value = parseNumberStr(sub3);
     if (isNaN(value) || value < 0) {
       const prefix = getGlobalPrefix();
@@ -9417,7 +9915,7 @@ async function handleSet(api, message, p, senderId, sub2, sub3) {
     }, threadId, message.type);
   }
 
-  if (sub2 === "lt" || sub2 === "lienthang" || sub2 === "stone") {
+  if (String(sub2||"").toLowerCase() === "lt" || String(sub2||"").toLowerCase() === "lienthang" || String(sub2||"").toLowerCase() === "stone") {
     const value = parseNumberStr(sub3);
     if (isNaN(value) || value < 0) {
       const prefix = getGlobalPrefix();
@@ -9441,7 +9939,7 @@ async function handleSet(api, message, p, senderId, sub2, sub3) {
     }, threadId, message.type);
   }
 
-  if (sub2 === "donate" || sub2 === "don") {
+  if (String(sub2||"").toLowerCase() === "donate" || String(sub2||"").toLowerCase() === "don") {
     const value = parseAmountStr(sub3);
     if (isNaN(value) || value < 0) {
       const prefix = getGlobalPrefix();
@@ -9476,7 +9974,7 @@ ${primeLine}${titleLine}${milestoneRewards.length > 0 ? `━━━━━━━�
     }, threadId, message.type);
   }
 
-  if (sub2 === "phaptac") {
+  if (String(sub2||"").toLowerCase() === "phaptac") {
     const value = parseInt(sub3, 10);
     if (isNaN(value) || value < 1 || value > PHAPTAC_MAX_LEVEL) {
       const prefix = getGlobalPrefix();
@@ -9619,7 +10117,7 @@ async function handleBuff(api, message, sub2, sub3, sub4) {
   const prefix = getGlobalPrefix();
   logAdminAction(senderId, "buff", `${sub2 || ""} ${sub3 || ""}${sub4 ? " " + sub4 : ""}`, targetId);
 
-  if (sub2 === "donate") {
+  if (String(sub2||"").toLowerCase() === "donate") {
     const amount = parseAmountStr(sub3, 1000);
     if (isNaN(amount) || amount <= 0) {
       return api.sendMessage({
@@ -9654,7 +10152,7 @@ ${primeUpgrade}${titleLine}${milestoneRewards.length > 0 ? `━━━━━━�
     return api.sendMessage({ msg, quote: message, ttl: 30000 }, threadId, message.type);
   }
 
-  if (sub2 === "combo") {
+  if (String(sub2||"").toLowerCase() === "combo") {
     const combo = DONATE_COMBOS.find(c => c.id === (sub3 || "").trim());
     if (!combo) {
       const list = DONATE_COMBOS.map(c => `• ${c.id}: ${c.emoji} ${c.name} (${formatNumber(c.price)}đ)`).join("\n");
@@ -9704,7 +10202,7 @@ ${granted.map(g => `• ${g}`).join("\n")}
     return api.sendMessage({ msg, quote: message, ttl: 30000 }, threadId, message.type);
   }
 
-  if (sub2 === "bones" || sub2 === "xuong") {
+  if (String(sub2||"").toLowerCase() === "bones" || String(sub2||"").toLowerCase() === "xuong") {
     const amount = parseInt(sub3, 10);
     if (isNaN(amount) || amount <= 0) {
       return api.sendMessage({
@@ -9732,7 +10230,7 @@ ${granted.map(g => `• ${g}`).join("\n")}
     }, threadId, message.type);
   }
 
-  if (sub2 === "soul" || sub2 === "linhhon") {
+  if (String(sub2||"").toLowerCase() === "soul" || String(sub2||"").toLowerCase() === "linhhon") {
     const amount = parseInt(sub3, 10);
     if (isNaN(amount) || amount <= 0) {
       return api.sendMessage({
@@ -9760,7 +10258,7 @@ ${granted.map(g => `• ${g}`).join("\n")}
     }, threadId, message.type);
   }
 
-  if (sub2 === "fire" || sub2 === "lua") {
+  if (String(sub2||"").toLowerCase() === "fire" || String(sub2||"").toLowerCase() === "lua") {
     const amount = parseInt(sub3, 10);
     if (isNaN(amount) || amount <= 0) {
       return api.sendMessage({
@@ -9788,7 +10286,70 @@ ${granted.map(g => `• ${g}`).join("\n")}
     }, threadId, message.type);
   }
 
-  if (sub2 === "item") {
+  // ── SÁNG THẾ LỆNH (cú pháp tắt, không cần chữ "item") ──
+  // tl buff sang_the_lenh 0 @user — chỉ thu của người được tag
+  // tl buff sang_the_lenh 1 @user — ban cho người được tag
+  if (String(sub2||"").toLowerCase() === SANG_THE_LENH_ID) {
+    if (!isDangSangThe(senderId)) {
+      return api.sendMessage({ msg: "❌ Chỉ Đấng Sáng Thế mới có thể ban/thu Sáng Thế Lệnh!", quote: message, ttl: 15000 }, threadId, message.type);
+    }
+    const hasMention = !!message.data.mentions?.[0]?.uid;
+    const data = loadData();
+    if (sub3 === "0") {
+      if (hasMention) {
+        const key = resolvePlayerKey(targetId);
+        if (!data.players[key]) {
+          return api.sendMessage({ msg: "❌ Người dùng này chưa có tài khoản game.", quote: message, ttl: 15000 }, threadId, message.type);
+        }
+        const t = data.players[key];
+        const targetName = message.data.mentions?.[0]?.dName || targetId;
+        if (!t.inventory?.potions?.[SANG_THE_LENH_ID]) {
+          return api.sendMessage({ msg: `ℹ️ ${targetName} không có Sáng Thế Lệnh để thu hồi.`, quote: message, ttl: 15000 }, threadId, message.type);
+        }
+        delete t.inventory.potions[SANG_THE_LENH_ID];
+        saveData();
+        return api.sendMessage({
+          msg: `🔱 THU HỒI SÁNG THẾ LỆNH!
+━━━━━━━━━━━━━━━━
+🗑️ Đã thu hồi Sáng Thế Lệnh của ${targetName}!
+⚠️ Quyền hạn quản trị cấp cao của người này đã mất hiệu lực!`,
+          quote: message, ttl: 30000,
+        }, threadId, message.type);
+      }
+      // Không tag → thu toàn bộ (giống buff item sang_the_lenh 0)
+      let revokedCount = 0;
+      for (const p of Object.values(data.players || {})) {
+        if (p?.inventory?.potions?.[SANG_THE_LENH_ID]) {
+          delete p.inventory.potions[SANG_THE_LENH_ID];
+          revokedCount++;
+        }
+      }
+      saveData();
+      return api.sendMessage({
+        msg: `🔱 THU HỒI SÁNG THẾ LỆNH TOÀN SERVER!
+━━━━━━━━━━━━━━━━
+🌟 Đấng Sáng Thế đã thu hồi toàn bộ Sáng Thế Lệnh!
+🗑️ Đã thu hồi: ${revokedCount} mệnh lệnh`,
+        quote: message, ttl: 30000,
+      }, threadId, message.type);
+    }
+    if (!hasMention) {
+      return api.sendMessage({
+        msg: `❌ Sai cú pháp. Dùng: ${prefix}tl buff sang_the_lenh <1|0> @user\nVD: ${prefix}tl buff sang_the_lenh 0 @user — thu của người đó`,
+        quote: message, ttl: 15000,
+      }, threadId, message.type);
+    }
+    const targetName = message.data.mentions?.[0]?.dName || targetId;
+    grantToken(targetId, SANG_THE_LENH_ID);
+    return api.sendMessage({
+      msg: `🔱 BAN SÁNG THẾ LỆNH!
+━━━━━━━━━━━━━━━━
+🌟 Đấng Sáng Thế đã ban Sáng Thế Lệnh cho ${targetName}!`,
+      quote: message, ttl: 30000,
+    }, threadId, message.type);
+  }
+
+  if (String(sub2||"").toLowerCase() === "item") {
     if (!isDangSangThe(senderId)) {
       return api.sendMessage({ msg: "❌ Chỉ Đấng Sáng Thế mới có thể dùng lệnh buff item!", quote: message, ttl: 15000 }, threadId, message.type);
     }
@@ -9801,8 +10362,28 @@ ${granted.map(g => `• ${g}`).join("\n")}
     }
 
     // ── THU HỒI SÁNG THẾ LỆNH ──
+    // Có tag @user → chỉ thu của người đó; không tag → thu toàn bộ (hành vi cũ)
     if (rawId === SANG_THE_LENH_ID && sub4 === "0") {
+      const hasMention = !!message.data.mentions?.[0]?.uid;
       const data = loadData();
+      if (hasMention) {
+        const key = resolvePlayerKey(targetId);
+        if (!data.players[key]) {
+          return api.sendMessage({ msg: "❌ Người dùng này chưa có tài khoản game.", quote: message, ttl: 15000 }, threadId, message.type);
+        }
+        const t = data.players[key];
+        const targetName = message.data.mentions?.[0]?.dName || targetId;
+        if (!t.inventory?.potions?.[SANG_THE_LENH_ID]) {
+          return api.sendMessage({ msg: `ℹ️ ${targetName} không có Sáng Thế Lệnh để thu hồi.`, quote: message, ttl: 15000 }, threadId, message.type);
+        }
+        delete t.inventory.potions[SANG_THE_LENH_ID];
+        saveData();
+        const msg = `🔱 THU HỒI SÁNG THẾ LỆNH!
+━━━━━━━━━━━━━━━━
+🗑️ Đã thu hồi Sáng Thế Lệnh của ${targetName}!
+⚠️ Quyền hạn quản trị cấp cao của người này đã mất hiệu lực!`;
+        return api.sendMessage({ msg, quote: message, ttl: 30000 }, threadId, message.type);
+      }
       let revokedCount = 0;
       for (const [key, p] of Object.entries(data.players)) {
         if (p.inventory?.potions?.[SANG_THE_LENH_ID]) {
@@ -9826,7 +10407,9 @@ ${granted.map(g => `• ${g}`).join("\n")}
     const congpha = CONGPHA.find(c => c.id === rawId);
     const special = SPECIAL_ITEMS.find(s => s.id === rawId);
     const token = getTokenItem(rawId);
-    const item = weapon || armor || potion || congpha || special || token;
+    const phapBao = PHAP_BAO.find(pb => pb.id === rawId);
+    const material = MATERIALS.find(m => m.id === rawId);
+    const item = weapon || armor || potion || congpha || special || token || phapBao || material;
 
     // Hàng Shop Đen custom (mảnh vỡ gương, vũ khí đen, dấu ấn...)
     let shopDenEntry = null;
@@ -9838,6 +10421,110 @@ ${granted.map(g => `• ${g}`).join("\n")}
 
     if (!item && !shopDenEntry) {
       return api.sendMessage({ msg: `❌ Không tìm thấy vật phẩm ID ${rawId}!`, quote: message, ttl: 15000 }, threadId, message.type);
+    }
+
+    // ── THU VẬT PHẨM: tl buff item <ID> 0 [@user] ──
+    // Có tag → chỉ thu người đó; không tag → thu toàn server
+    if (sub4 === "0") {
+      const data = loadData();
+      const invId = shopDenEntry ? shopDenEntry.id : item.id;
+      const displayName = shopDenEntry ? shopDenEntry.name : item.name;
+      const displayEmoji = shopDenEntry ? shopDenEntry.emoji : item.emoji;
+      const stripOne = (pl) => {
+        pl.inventory = pl.inventory || {};
+        let had = false;
+        let unequipped = false;
+        if (weapon) {
+          if (pl.inventory.weapons?.[invId]) { delete pl.inventory.weapons[invId]; had = true; }
+          if (pl.equippedWeapon === invId) { pl.equippedWeapon = null; unequipped = true; }
+          setUpgradeLevel(pl, invId, 0);
+        } else if (armor) {
+          if (pl.inventory.armors?.[invId]) { delete pl.inventory.armors[invId]; had = true; }
+          if (pl.equippedArmor === invId) { pl.equippedArmor = null; unequipped = true; }
+          setUpgradeLevel(pl, invId, 0);
+        } else if (special) {
+          if (pl.inventory.phapTac?.[invId]) { delete pl.inventory.phapTac[invId]; had = true; }
+          if (pl.equippedPhapTac === invId) { pl.equippedPhapTac = null; unequipped = true; }
+        } else if (phapBao) {
+          if (pl.inventory.phapBao?.[invId]) { delete pl.inventory.phapBao[invId]; had = true; }
+          if (pl.equippedPhapBao === invId) { pl.equippedPhapBao = null; unequipped = true; }
+          setUpgradeLevel(pl, invId, 0);
+        } else if (material) {
+          if ((pl.inventory.materials?.[invId] || 0) > 0) { delete pl.inventory.materials[invId]; had = true; }
+        } else {
+          if ((pl.inventory.potions?.[invId] || 0) > 0) { delete pl.inventory.potions[invId]; had = true; }
+        }
+        return { had, unequipped };
+      };
+      if (message.data.mentions?.[0]?.uid) {
+        const key = resolvePlayerKey(targetId);
+        if (!data.players[key]) {
+          return api.sendMessage({ msg: "❌ Người dùng này chưa có tài khoản game.", quote: message, ttl: 15000 }, threadId, message.type);
+        }
+        const targetName = message.data.mentions?.[0]?.dName || targetId;
+        const { had, unequipped } = stripOne(data.players[key]);
+        if (!had && !unequipped) {
+          return api.sendMessage({ msg: `ℹ️ ${targetName} không có vật phẩm ID ${invId} để thu hồi.`, quote: message, ttl: 15000 }, threadId, message.type);
+        }
+        saveData();
+        const msg = `🔱 THU HỒI VẬT PHẨM!
+━━━━━━━━━━━━━━━━
+🗑️ Đã thu hồi ${displayEmoji} ${displayName} của ${targetName}!${unequipped ? "\n🛡️ Đã tháo khỏi người!" : ""}`;
+        return api.sendMessage({ msg, quote: message, ttl: 30000 }, threadId, message.type);
+      }
+      let revokedCount = 0;
+      for (const pl of Object.values(data.players || {})) {
+        if (!pl) continue;
+        const { had, unequipped } = stripOne(pl);
+        if (had || unequipped) revokedCount++;
+      }
+      saveData();
+      const msg = `🔱 THU HỒI VẬT PHẨM TOÀN SERVER!
+━━━━━━━━━━━━━━━━
+🗑️ Đã thu hồi ${displayEmoji} ${displayName} của ${revokedCount} đạo hữu!`;
+      return api.sendMessage({ msg, quote: message, ttl: 30000 }, threadId, message.type);
+    }
+
+    // ── PHÁT TOÀN SERVER: tl buff item <ID> all ──
+    if (String(sub4 || "").toLowerCase() === "all") {
+      const dataAll = loadData();
+      let count = 0;
+      for (const key of Object.keys(dataAll.players || {})) {
+        const pl = dataAll.players[key];
+        if (!pl || pl.banned) continue;
+        pl.inventory = pl.inventory || {};
+        pl.inventory.weapons = pl.inventory.weapons || {};
+        pl.inventory.armors = pl.inventory.armors || {};
+        pl.inventory.potions = pl.inventory.potions || {};
+        pl.inventory.phapTac = pl.inventory.phapTac || {};
+        pl.inventory.phapBao = pl.inventory.phapBao || {};
+        pl.inventory.materials = pl.inventory.materials || {};
+        if (shopDenEntry) {
+          pl.inventory.potions[shopDenEntry.id] = (pl.inventory.potions[shopDenEntry.id] || 0) + 1;
+        } else if (token) {
+          if (token.id === AN_TU_VI_LENH_ID || token.id === HIEN_NGUYEN_HINH_ID) {
+            const otherTok = token.id === AN_TU_VI_LENH_ID ? HIEN_NGUYEN_HINH_ID : AN_TU_VI_LENH_ID;
+            delete pl.inventory.potions[otherTok];
+          }
+          pl.inventory.potions[token.id] = 1;
+        } else if (weapon) pl.inventory.weapons[weapon.id] = 1;
+        else if (armor) pl.inventory.armors[armor.id] = 1;
+        else if (special) pl.inventory.phapTac[special.id] = 1;
+        else if (phapBao) pl.inventory.phapBao[phapBao.id] = 1;
+        else if (material) pl.inventory.materials[material.id] = (pl.inventory.materials[material.id] || 0) + 1;
+        else pl.inventory.potions[item.id] = (pl.inventory.potions[item.id] || 0) + 1;
+        count++;
+      }
+      saveData();
+      logAdminAction(senderId, "buff", `item ${rawId} all (${count} players)`, null);
+      const displayName = shopDenEntry ? shopDenEntry.name : item.name;
+      const displayEmoji = shopDenEntry ? shopDenEntry.emoji : item.emoji;
+      const msg = `🎁 THƯỢNG TIÊN BAN PHƯỚC TOÀN SERVER!
+━━━━━━━━━━━━━━━━
+🌟 (admin) ban cho ${count} đạo hữu: ${displayEmoji} ${displayName}
+━━━━━━━━━━━━━━━━
+💡 ${prefix}tl bag để kiểm tra túi đồ`;
+      return api.sendMessage({ msg, quote: message, ttl: 30000 }, threadId, message.type);
     }
 
     const data = loadData();
@@ -9856,7 +10543,17 @@ ${granted.map(g => `• ${g}`).join("\n")}
     } else if (weapon) addItem(targetId, weapon.id, "weapon");
     else if (armor) addItem(targetId, armor.id, "armor");
     else if (special) addItem(targetId, special.id, "phapTac", 1);
-    else addItem(targetId, item.id, "potion", qty);
+    else if (phapBao) {
+      const t = getPlayer(targetId);
+      if (!t.inventory.phapBao) t.inventory.phapBao = {};
+      t.inventory.phapBao[phapBao.id] = 1;
+      saveData();
+    } else if (material) {
+      const t = getPlayer(targetId);
+      if (!t.inventory.materials) t.inventory.materials = {};
+      t.inventory.materials[material.id] = (t.inventory.materials[material.id] || 0) + qty;
+      saveData();
+    } else addItem(targetId, item.id, "potion", qty);
 
     const displayName = shopDenEntry ? shopDenEntry.name : item.name;
     const displayEmoji = shopDenEntry ? shopDenEntry.emoji : item.emoji;
@@ -9869,7 +10566,7 @@ ${granted.map(g => `• ${g}`).join("\n")}
     return api.sendMessage({ msg, quote: message, ttl: 30000 }, threadId, message.type);
   }
 
-  if (sub2 === "tieucanhgioi" || sub2 === "daicanhgioi") {
+  if (String(sub2||"").toLowerCase() === "tieucanhgioi" || String(sub2||"").toLowerCase() === "daicanhgioi") {
     const amount = parseInt(sub3, 10);
     if (isNaN(amount) || amount <= 0) {
       return api.sendMessage({
@@ -9886,7 +10583,7 @@ ${granted.map(g => `• ${g}`).join("\n")}
     const target = data.players[resolvePlayerKey(targetId)];
     const oldRealm = getRealmDisplay(target.majorRealm, target.minorRealm, target.daotam);
 
-    if (sub2 === "tieucanhgioi") {
+    if (String(sub2||"").toLowerCase() === "tieucanhgioi") {
       const targetTier = target.minorRealm + amount;
       const targetMaxMajor = getMaxMajorRealm(target.daotam);
       let tier = Math.min(targetTier, MAX_MINOR_REALM * targetMaxMajor);
