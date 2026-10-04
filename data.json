@@ -1,0 +1,30 @@
+{
+  "prefix": ",",
+  "setupDone": true,
+  "qtv": [
+    "1370302308922953779"
+  ],
+  "users": {
+    "1370302308922953779": {
+      "name": "trongdai102",
+      "realm": 9,
+      "exp": 14,
+      "hp": 100,
+      "maxHp": 100,
+      "hpBonus": 0,
+      "atkBonus": 0,
+      "defBonus": 0,
+      "spiritStones": 1,
+      "beQuanStart": 1781539053,
+      "inventory": [],
+      "equipment": [],
+      "character": "bachvotran",
+      "speedBonus": 0,
+      "luckBonus": 0,
+      "winCount": 0,
+      "lossCount": 0,
+      "lastCultivate": 1781538437,
+      "lastEvent": 1781539042
+    }
+  }
+}

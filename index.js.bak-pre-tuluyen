@@ -1,0 +1,952 @@
+const { Client, GatewayIntentBits, EmbedBuilder, Routes } = require('discord.js');
+
+const sc = require('./soundcloud-api');
+const cult = require('./cultivation');
+const fs = require('fs');
+const path = require('path');
+const { spawn } = require('child_process');
+require('dotenv').config();
+
+const DATA_FILE = './data.json';
+
+let data;
+if (fs.existsSync(DATA_FILE)) {
+  try {
+    data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+  } catch {
+    console.error('[DATA] File data.json bị lỗi, khởi tạo lại dữ liệu mặc định');
+    data = { prefix: ',', setupDone: false, qtv: [], users: {} };
+    saveData();
+  }
+  if (!data.users) data.users = {};
+  if (!data.qtv) data.qtv = [];
+} else {
+  data = { prefix: ',', setupDone: false, qtv: [], users: {} };
+  saveData();
+}
+
+function saveData() {
+  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+}
+
+function getUserData(userId, username = '') {
+  if (!data.users) data.users = {};
+  if (!data.users[userId]) {
+    data.users[userId] = {
+      name: username,
+      realm: 0,
+      exp: 0,
+      hp: 100,
+      maxHp: 100,
+      hpBonus: 0,
+      atkBonus: 0,
+      defBonus: 0,
+      spiritStones: 0,
+      beQuanStart: 0,
+      inventory: [],
+      equipment: [],
+      character: 'normal',
+      speedBonus: 0,
+      luckBonus: 0,
+      winCount: 0,
+      lossCount: 0,
+      lastCultivate: 0,
+      lastEvent: 0,
+    };
+    saveData();
+  }
+  if (username && data.users[userId].name !== username) {
+    data.users[userId].name = username;
+  }
+  return data.users[userId];
+}
+
+const COOLDOWN_CULTIVATE = 30;
+const COOLDOWN_EVENT = 120;
+const BE_QUAN_MIN_INTERVAL = 60;
+const PK_TIMEOUT = 60;
+
+const searches = new Map();
+const pkChallenges = new Map();
+
+async function executePk(message, p1, p2, u1, u2) {
+  const s1 = cult.getTotalStats(u1);
+  const s2 = cult.getTotalStats(u2);
+
+  const isGod1 = typeof s1.hp === 'string' || typeof s1.atk === 'string';
+  const isGod2 = typeof s2.hp === 'string' || typeof s2.atk === 'string';
+
+  if (isGod1 && !isGod2) {
+    u1.winCount++; u2.lossCount++;
+    const stonesWon = Math.floor(Math.random() * 50 + 30);
+    u1.spiritStones += stonesWon;
+    saveData();
+    return message.reply({
+      embeds: [new EmbedBuilder()
+        .setColor(0x9B59B6)
+        .setTitle(`⚔️ ${p1.username} vs ${p2.username}`)
+        .setDescription(`💫 **${p1.username}** tung một chưởng — uy lực vô biên!\n🌌 ${p2.username} tan biến trong hư vô.`)
+        .addFields(
+          { name: '🏆 Người thắng', value: `${p1}`, inline: true },
+          { name: '💎 Tiền thưởng', value: `+${stonesWon} LT`, inline: true },
+        )],
+    });
+  }
+  if (!isGod1 && isGod2) {
+    u2.winCount++; u1.lossCount++;
+    const stonesWon = Math.floor(Math.random() * 50 + 30);
+    u2.spiritStones += stonesWon;
+    saveData();
+    return message.reply({
+      embeds: [new EmbedBuilder()
+        .setColor(0x9B59B6)
+        .setTitle(`⚔️ ${p1.username} vs ${p2.username}`)
+        .setDescription(`💫 **${p2.username}** khẽ động thân — không gian vỡ vụn!\n🌌 ${p1.username} hóa thành tro bụi.`)
+        .addFields(
+          { name: '🏆 Người thắng', value: `${p2}`, inline: true },
+          { name: '💎 Tiền thưởng', value: `+${stonesWon} LT`, inline: true },
+        )],
+    });
+  }
+
+  const speedCompare = cult.compareStat(s1.speed, s2.speed);
+  const first = speedCompare >= 0
+    ? { u: u1, s: s1, name: p1.username, tag: p1 }
+    : { u: u2, s: s2, name: p2.username, tag: p2 };
+  const second = speedCompare >= 0
+    ? { u: u2, s: s2, name: p2.username, tag: p2 }
+    : { u: u1, s: s1, name: p1.username, tag: p1 };
+
+  let hp1 = typeof s1.hp === 'string' ? Infinity : s1.hp;
+  let hp2 = typeof s2.hp === 'string' ? Infinity : s2.hp;
+  let log = [];
+  const maxTurns = 20;
+  let turn = 0;
+
+  while ((hp1 > 0 || hp1 === Infinity) && (hp2 > 0 || hp2 === Infinity) && turn < maxTurns) {
+    turn++;
+    for (const side of [first, second]) {
+      const isP1 = side.name === p1.username;
+      const curHp = isP1 ? hp1 : hp2;
+      const oppHp = isP1 ? hp2 : hp1;
+      if (oppHp <= 0 && oppHp !== Infinity) continue;
+      if (curHp <= 0 && curHp !== Infinity) continue;
+      const oppSide = isP1 ? second : first;
+      const oppS = oppSide.s;
+
+      const dodgeChance = cult.calcDodge(oppS.speed, side.s.speed);
+      if (Math.random() < dodgeChance) {
+        log.push(`💨 **${oppSide.name}** né đòn của **${side.name}**!`);
+        continue;
+      }
+
+      const dmg = cult.calcDamage(side.s.atk, oppS.def, side.s.crit);
+      if (isP1) hp2 = oppHp === Infinity ? Infinity : oppHp - dmg.damage;
+      else hp1 = oppHp === Infinity ? Infinity : oppHp - dmg.damage;
+      const critTag = dmg.isCrit ? ' 💥**CHÍ MẠNG**' : '';
+      const dmgStr = oppHp === Infinity ? '0 (bất tử)' : `${dmg.damage}`;
+      log.push(`**${side.name}** gây **${dmgStr}** sát thương${critTag} (HP ${oppSide.name}: ${Math.max(0, isP1 ? hp2 : hp1)})`);
+      if ((isP1 ? hp2 : hp1) <= 0 && (isP1 ? hp2 : hp1) !== Infinity) break;
+    }
+  }
+
+  const p1Alive = hp1 > 0 || hp1 === Infinity;
+  const p2Alive = hp2 > 0 || hp2 === Infinity;
+  const winner = p1Alive ? p1 : p2;
+  const loser = p1Alive ? p2 : p1;
+  const wData = p1Alive ? u1 : u2;
+  const lData = p1Alive ? u2 : u1;
+  wData.winCount++;
+  lData.lossCount++;
+  const stonesWon = Math.floor(Math.random() * 20 + 10);
+  wData.spiritStones += stonesWon;
+  saveData();
+
+  const speedAdvantage = speedCompare > 0 ? ` (${first.name} nhanh hơn, đánh trước)` : speedCompare < 0 ? ` (${second.name} nhanh hơn, đánh trước)` : ' (tốc độ ngang nhau)';
+  return message.reply({
+    embeds: [new EmbedBuilder()
+      .setColor(p1Alive ? 0x2ECC71 : 0xE74C3C)
+      .setTitle(`⚔️ ${p1.username} vs ${p2.username}`)
+      .setDescription((log.slice(0, 6).join('\n') + (log.length > 6 ? '\n...' : '')) || 'Hòa?')
+      .addFields(
+        { name: '🏆 Người thắng', value: `${winner}`, inline: true },
+        { name: '💎 Tiền thưởng', value: `+${stonesWon} LT`, inline: true },
+        { name: '💨 Tốc độ', value: speedAdvantage, inline: false },
+      )],
+  });
+}
+
+function isQtv(userId) {
+  return data.qtv.includes(userId);
+}
+
+function parseCommand(content, prefix) {
+  if (!content.startsWith(prefix)) return null;
+  const withoutPrefix = content.slice(prefix.length).trim();
+  const parts = withoutPrefix.split(/ +/);
+  const cmd = parts.shift().toLowerCase();
+  return { cmd, args: parts };
+}
+
+process.on('unhandledRejection', (err) => {
+  console.error('[UNHANDLED REJECTION]', err);
+});
+
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildVoiceStates,
+  ],
+});
+
+client.on('messageCreate', async (message) => {
+  if (message.author.bot) return;
+
+  const prefix = data.prefix;
+
+  if (message.mentions.has(client.user) && (message.content.trim() === `<@${client.user.id}>` || message.content.trim() === `<@!${client.user.id}>`)) {
+    return message.reply(`👋 Prefix hiện tại: \`${prefix}\` — Gõ \`${prefix}help\` để xem danh sách lệnh.`);
+  }
+
+  if (message.content.trim().toLowerCase() === 'prefix') {
+    return message.reply(`Prefix hiện tại: \`${prefix}\``);
+  }
+
+  const repliedSearch = searches.get(message.author.id);
+  if (message.reference && message.reference.messageId && repliedSearch) {
+    if (message.reference.messageId === repliedSearch.messageId) {
+      const num = parseInt(message.content);
+      if (num >= 1 && num <= repliedSearch.tracks.length) {
+        const track = repliedSearch.tracks[num - 1];
+        searches.delete(message.author.id);
+
+        const statusMsg = await message.reply('Đang tải nhạc...');
+        const tmpDir = '/tmp/opencode';
+        if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
+        const tmpMp3 = path.join(tmpDir, `track_${track.id}.mp3`);
+        const tmpOgg = path.join(tmpDir, `track_${track.id}.ogg`);
+
+        try {
+          await sc.downloadTrack(track.permalink_url, tmpMp3);
+          await statusMsg.edit('Đang chuyển đổi...');
+
+          await new Promise((resolve, reject) => {
+            const ff = spawn(require('ffmpeg-static'), [
+              '-i', tmpMp3,
+              '-c:a', 'libopus',
+              '-b:a', '64k',
+              '-ar', '48000',
+              '-ac', '1',
+              '-f', 'ogg',
+              tmpOgg,
+            ]);
+            ff.on('close', code => code === 0 ? resolve() : reject(new Error(`ffmpeg exit code ${code}`)));
+            ff.on('error', reject);
+          });
+
+          await statusMsg.edit('Đang tải lên...');
+          const oggBuf = fs.readFileSync(tmpOgg);
+
+          await message.channel.client.rest.post(Routes.channelMessages(message.channel.id), {
+            body: {
+              attachments: [{ id: 0, filename: 'soundcloud.ogg', is_voice_message: true }],
+            },
+            files: [{ data: oggBuf, name: 'soundcloud.ogg', contentType: 'audio/ogg' }],
+          });
+
+          const info = sc.extractTrackInfo(track);
+          const embed = new EmbedBuilder()
+            .setColor(0xFF5500)
+            .setTitle('Đã gửi voice message')
+            .setDescription(`[${info.title}](${info.permalinkUrl}) — ${info.username}`)
+            .setFooter({ text: `SoundCloud • ${info.duration}` });
+          if (info.artworkUrl) embed.setThumbnail(info.artworkUrl);
+
+          await statusMsg.edit({ content: '', embeds: [embed] });
+        } catch (err) {
+          await statusMsg.edit(`Lỗi: ${err.message}`);
+        } finally {
+          try { fs.unlinkSync(tmpMp3); } catch {}
+          try { fs.unlinkSync(tmpOgg); } catch {}
+        }
+        return;
+      }
+    }
+  }
+
+  const parsed = parseCommand(message.content, prefix);
+  if (!parsed) return;
+
+  const { cmd, args } = parsed;
+
+  if (!cmd) {
+    return message.reply(`nếu mày thắc mắc tao có những lệnh gì thì hãy ${prefix}help`);
+  }
+
+  if ((cmd === 'set' && args[0] && args[0].toLowerCase() === 'up') || cmd === 'setup') {
+    if (data.setupDone) {
+      return message.reply('Setup đã được thực hiện rồi! Chỉ có qtv mới có thể dùng lệnh quản trị.');
+    }
+    data.setupDone = true;
+    data.qtv.push(message.author.id);
+    saveData();
+    return message.reply('Bạn đã trở thành **đấng sáng thế**! Toàn quyền bot.');
+  }
+
+  if (cmd === 'add' && args[0] && args[0].toLowerCase() === 'qtv') {
+    if (!isQtv(message.author.id)) {
+      return message.reply('Bạn hong có quyền!');
+    }
+    const target = message.mentions.users.first();
+    if (!target) return message.reply('Tag người cần add!');
+    if (data.qtv.includes(target.id)) return message.reply('Người này đã là qtv rồi!');
+    data.qtv.push(target.id);
+    saveData();
+    return message.reply(`Đã thêm **${target.tag}** làm qtv.`);
+  }
+
+  if (cmd === 'remove' && args[0] && args[0].toLowerCase() === 'qtv') {
+    if (!isQtv(message.author.id)) {
+      return message.reply('Bạn hong có quyền!');
+    }
+    const target = message.mentions.users.first();
+    if (!target) return message.reply('Tag người cần xóa!');
+    if (!data.qtv.includes(target.id)) return message.reply('Người này không phải qtv!');
+    if (target.id === message.author.id) return message.reply('Không thể tự xóa chính mình!');
+    data.qtv = data.qtv.filter((id) => id !== target.id);
+    saveData();
+    return message.reply(`Đã xóa **${target.tag}** khỏi qtv.`);
+  }
+
+  if (['listadmin', 'list-qtv', 'admin'].includes(cmd)) {
+    if (!isQtv(message.author.id)) {
+      return message.reply('Bạn hong có quyền!');
+    }
+    if (data.qtv.length === 0) return message.reply('Chưa có admin nào!');
+    const lines = await Promise.all(data.qtv.map(async (id) => {
+      try {
+        const user = await client.users.fetch(id);
+        return `• **${user.tag}** ${id === data.qtv[0] ? '👑 Đấng Sáng Thế' : '🛡️ QTV'}`;
+      } catch {
+        return `• \`${id}\` (không tìm thấy)`;
+      }
+    }));
+    const embed = new EmbedBuilder()
+      .setColor(0x2ECC71)
+      .setTitle('📋 Danh Sách Quản Trị')
+      .setDescription(lines.join('\n'))
+      .setFooter({ text: `Tổng: ${data.qtv.length} người` });
+    return message.reply({ embeds: [embed] });
+  }
+
+  if (cmd === 'prefix') {
+    if (!args[0]) return message.reply(`Prefix hiện tại: \`${prefix}\``);
+    if (!isQtv(message.author.id)) return message.reply('Bạn hong có quyền!');
+    let newPrefix = args[0] === 'change' ? args[1] : args[0];
+    if (!newPrefix) return message.reply('Nhập prefix mới! VD: `,prefix +`');
+    if (newPrefix.startsWith('+')) newPrefix = newPrefix.slice(1);
+    if (!newPrefix) return message.reply('Prefix không hợp lệ!');
+    data.prefix = newPrefix;
+    saveData();
+    return message.reply(`Đã đổi prefix thành \`${newPrefix}\``);
+  }
+
+  if (cmd === 'music') {
+    const query = args.join(' ');
+    if (!query) return message.reply('Nhập tên bài hát!');
+
+    const statusMsg = await message.reply('Đang tìm trên SoundCloud...');
+
+    try {
+      const results = await sc.searchTracks(query, 10);
+
+      if (!results || results.length === 0) {
+        return statusMsg.edit('Không tìm thấy kết quả!');
+      }
+
+      const desc = results
+        .map((t, i) => {
+          const dur = t.duration ? sc.formatDuration(t.duration) : '?:??';
+          return `**${i + 1}.** ${t.title} - ${t.user?.username || 'Unknown'} [${dur}]`;
+        })
+        .join('\n');
+
+      const embed = new EmbedBuilder()
+        .setColor(0xFF5500)
+        .setTitle('Kết quả SoundCloud')
+        .setDescription(desc)
+        .setFooter({ text: 'Reply số 1-10 để chọn bài' });
+
+      const sent = await statusMsg.edit({ content: '', embeds: [embed] });
+
+      searches.set(message.author.id, {
+        tracks: results,
+        messageId: sent.id,
+      });
+    } catch (err) {
+      statusMsg.edit(`Lỗi: ${err.message}`);
+    }
+  }
+
+  if (['cmd', 'help', 'commands'].includes(cmd)) {
+    const embed = new EmbedBuilder()
+      .setColor(0x3498DB)
+      .setTitle(`📋 Danh Sách Lệnh — Prefix: \`${prefix}\``)
+      .addFields(
+        { name: '👤 Cơ bản', value:
+          `\`${prefix}setup\` — Set đấng sáng thế\n` +
+          `\`${prefix}tt\` / \`${prefix}thong-tin\` — Xem thông tin\n` +
+          `\`${prefix}tl stats\` — Xem chỉ số chi tiết\n` +
+          `\`${prefix}tl bank @user <số>\` — Bank LT\n` +
+          `\`${prefix}bxh\` / \`${prefix}bang-xep-hang\` — Bảng xếp hạng` },
+        { name: '⚔️ Chiến đấu', value:
+          `\`${prefix}tl pk @user\` — Thách đấu\n` +
+          `\`${prefix}tl pk ok\` — Chấp nhận PK\n` +
+          `\`${prefix}tl wiki\` — Xem cảnh giới` },
+        { name: '🧘 Tu luyện', value:
+          `\`${prefix}tu\` / \`${prefix}tu-luyen\` — Tu luyện (30s CD)\n` +
+          `\`${prefix}tl start\` — Bắt đầu bế quan\n` +
+          `\`${prefix}tl stop\` — Kết thúc bế quan\n` +
+          `\`${prefix}tham-hiem\` / \`${prefix}explore\` — Thám hiểm` },
+        { name: '🛒 Kinh tế', value:
+          `\`${prefix}shop\` — Cửa hàng\n` +
+          `\`${prefix}mua <tên>\` — Mua vật phẩm\n` +
+          `\`${prefix}tl bag\` — Túi đồ\n` +
+          `\`${prefix}dung <tên>\` — Dùng vật phẩm` },
+        { name: '🎵 Nhạc', value:
+          `\`${prefix}music <tên>\` — Tìm nhạc SoundCloud\n` +
+          `Reply số 1-10 vào kết quả để tải voice message` },
+        { name: '🛡️ Admin (QTV)', value:
+          `\`${prefix}add qtv @user\` — Thêm QTV\n` +
+          `\`${prefix}remove qtv @user\` — Xóa QTV\n` +
+          `\`${prefix}listadmin\` / \`${prefix}admin\` — DS admin\n` +
+          `\`${prefix}restart\` — Restart bot\n` +
+          `\`${prefix}prefix\` / \`${prefix}prefix <new>\` — Đổi prefix\n` +
+          `\`${prefix}tl set +stt @user <số>\` — Set cảnh giới\n` +
+          `\`${prefix}tl set bachvotran @user\` — Set Bạch Vô Trần\n` +
+          `\`${prefix}tl set phongquynhan @user\` — Set Phong Quy Nhàn` },
+      );
+    return message.reply({ embeds: [embed] });
+  }
+
+  if (cmd === 'del') {
+    if (!isQtv(message.author.id)) return message.reply('Bạn hong có quyền!');
+    if (!message.reference || !message.reference.messageId) return message.reply('Reply vào tin nhắn cần xóa!');
+    try {
+      const target = await message.channel.messages.fetch(message.reference.messageId);
+      await target.delete();
+    } catch {
+      return message.reply('Không thể xóa tin nhắn này!');
+    }
+  }
+
+  if (cmd === 'restart') {
+    if (!isQtv(message.author.id)) return message.reply('Bạn hong có quyền!');
+    await message.reply(`🔄 **${message.author.username}** đã yêu cầu khởi động lại bot!\n⏳ Bot sẽ restart trong **30 giây**...`);
+    console.log(`[RESTART] Yêu cầu bởi ${message.author.tag} (${message.author.id})`);
+    setTimeout(() => {
+      const child = spawn(process.argv[0], process.argv.slice(1), {
+        cwd: process.cwd(),
+        stdio: 'inherit',
+        detached: true,
+      });
+      child.unref();
+      process.exit(0);
+    }, 30000);
+    return;
+  }
+
+  // === TU TIEN COMMANDS ===
+
+  if (['tu', 'tu-luyen', 'tl'].includes(cmd)) {
+    if (args[0] === 'start') {
+      const u = getUserData(message.author.id, message.author.username);
+      const now = Math.floor(Date.now() / 1000);
+      if (u.beQuanStart && u.beQuanStart > 0) {
+        return message.reply('Bạn đang bế quan! Dùng `,tl stop` để kết thúc.');
+      }
+      u.beQuanStart = now;
+      saveData();
+      return message.reply(`🧘 **${message.author.username}** bắt đầu bế quan!\n⏳ Càng lâu càng nhiều — \`,be-quan\` để kiểm tra, \`,tl stop\` / \`,be-quan end\` để xuất quan.`);
+    }
+
+    if (args[0] === 'stop') {
+      const u = getUserData(message.author.id, message.author.username);
+      const now = Math.floor(Date.now() / 1000);
+      if (!u.beQuanStart || u.beQuanStart === 0) {
+        return message.reply('Bạn chưa bế quan! Dùng `,tl start` hoặc `,be-quan` để bắt đầu.');
+      }
+      const elapsed = now - u.beQuanStart;
+      if (elapsed < BE_QUAN_MIN_INTERVAL) {
+        return message.reply(`⏳ Cần bế quan ít nhất **${BE_QUAN_MIN_INTERVAL}s** mới có kết quả!`);
+      }
+      const expGain = Math.floor(elapsed * (5 + u.realm * 5) / 60);
+      const ltGain = Math.floor(elapsed * (1 + u.realm * 2) / 60);
+      u.exp += expGain;
+      u.spiritStones += ltGain;
+      const realmBonus = Math.floor(elapsed / 3600 * (1 + u.realm * 0.3));
+      if (realmBonus > 0) {
+        u.atkBonus = (u.atkBonus || 0) + realmBonus;
+        u.defBonus = (u.defBonus || 0) + Math.floor(realmBonus / 2);
+      }
+      while (u.realm < cult.REALMS.length - 1) {
+        const next = cult.getRealm(u.realm + 1);
+        if (u.exp >= next.expReq) {
+          u.realm++;
+          const newRealm = cult.getRealm(u.realm);
+          u.hp = newRealm.hp;
+          u.maxHp = newRealm.hp;
+        } else break;
+      }
+      u.beQuanStart = 0;
+      saveData();
+      const hours = Math.floor(elapsed / 3600);
+      const mins = Math.floor((elapsed % 3600) / 60);
+      const secs = elapsed % 60;
+      const timeStr = hours > 0 ? `${hours}g ${mins}p ${secs}s` : mins > 0 ? `${mins}p ${secs}s` : `${secs}s`;
+      let msg = `🎉 **Xuất quan!** Bế quan **${timeStr}**\n+${expGain} exp, +${ltGain} LT`;
+      if (realmBonus > 0) msg += `\n⚔️ +${realmBonus} ATK, +${Math.floor(realmBonus / 2)} DEF`;
+      return message.reply(msg);
+    }
+
+    if (args[0] === 'bank') {
+      const target = message.mentions.users.first();
+      if (!target) return message.reply('Tag người nhận! VD: `,tl bank @người`');
+      if (target.id === message.author.id) return message.reply('Không thể bank cho chính mình!');
+      const amount = parseInt(args.find(a => /^\d+$/.test(a)) || args[args.length - 1]);
+      if (!amount || amount <= 0) return message.reply('Nhập số LT cần bank!');
+      const u1 = getUserData(message.author.id);
+      const u2 = getUserData(target.id, target.username);
+      if (u1.spiritStones < amount) return message.reply(`Bạn chỉ có ${u1.spiritStones} LT!`);
+      u1.spiritStones -= amount;
+      u2.spiritStones += amount;
+      saveData();
+      return message.reply(`✅ Đã bank **${amount} LT** cho **${target.username}**!`);
+    }
+
+    if (args[0] === 'stats') {
+      const target = message.mentions.users.first() || message.author;
+      const u = getUserData(target.id, target.username);
+      const s = cult.getTotalStats(u);
+      const realm = cult.getRealm(u.realm);
+      const charKey = u.character || 'normal';
+      const charData = cult.CHARACTERS[charKey];
+      const isSpecial = charKey !== 'normal';
+
+      const embed = new EmbedBuilder()
+        .setColor(0x00AEFF)
+        .setTitle(`📊 Chỉ Số — ${target.username}`)
+        .addFields(
+          { name: '🌀 Cảnh giới', value: isSpecial ? `${realm.name} ⭐ ${charData.name}` : realm.name, inline: true },
+          { name: '📛 Nhân vật', value: charData ? charData.name : 'Tu Sĩ', inline: true },
+          { name: '❤️ HP', value: `${cult.displayStat(s.hp)}`, inline: true },
+          { name: '⚔️ ATK', value: `${cult.displayStat(s.atk)}`, inline: true },
+          { name: '🛡️ DEF', value: `${cult.displayStat(s.def)}`, inline: true },
+          { name: '💨 Speed', value: `${cult.displayStat(s.speed)}`, inline: true },
+          { name: '🍀 Luck', value: `${cult.displayStat(s.luck)}`, inline: true },
+          { name: '💥 Crit', value: `${(s.crit * 100).toFixed(1)}%`, inline: true },
+        )
+        .setFooter({ text: isSpecial ? charData.desc : '' });
+      return message.reply({ embeds: [embed] });
+    }
+
+    if (args[0] === 'set') {
+      if (!isQtv(message.author.id)) return message.reply('Bạn hong có quyền!');
+      const target = message.mentions.users.first();
+      if (!target) return message.reply('Tag người cần set!');
+
+      if (args[1] === '+stt' || args[1] === 'realm') {
+        const num = parseInt(args[2]);
+        if (isNaN(num) || num < 0 || num >= cult.REALMS.length) {
+          return message.reply(`Cảnh giới từ 0-${cult.REALMS.length - 1}!`);
+        }
+        const u = getUserData(target.id, target.username);
+        u.realm = num;
+        const newRealm = cult.getRealm(num);
+        u.hp = newRealm.hp;
+        u.maxHp = newRealm.hp;
+        u.exp = newRealm.expReq;
+        saveData();
+        return message.reply(`✅ Đã set **${target.username}** → **${newRealm.name}** (cảnh giới ${num})`);
+      }
+
+      if (args[1] === 'bachvotran' || args[1] === 'bvt') {
+        const u = getUserData(target.id, target.username);
+        u.character = 'bachvotran';
+        u.realm = 9;
+        saveData();
+        return message.reply(`✅ **${target.username}** đã hóa thân thành **Bạch Vô Trần**! Toàn chỉ số 1e200.`);
+      }
+
+      if (args[1] === 'phongquynhan' || args[1] === 'pqn') {
+        const u = getUserData(target.id, target.username);
+        u.character = 'phongquynhan';
+        u.realm = 9;
+        saveData();
+        return message.reply(`✅ **${target.username}** đã hóa thân thành **Phong Quy Nhàn**! ATK 1e180, HP 5e199, DEF 1e999, Speed 1e200.`);
+      }
+
+      if (args[1] === 'normal' || args[1] === 'reset') {
+        const u = getUserData(target.id, target.username);
+        u.character = 'normal';
+        saveData();
+        return message.reply(`✅ **${target.username}** đã trở lại thành Tu Sĩ bình thường.`);
+      }
+
+      return message.reply('Cú pháp: `,tl set +stt <số>`, `,tl set bachvotran`, `,tl set phongquynhan`, `,tl set normal`');
+    }
+
+    if (args[0] === 'wiki') {
+      const lines = cult.REALMS.map((r, i) =>
+        `**${i}.** ${r.name} — Cần ${r.expReq} exp | HP:${r.hp} ATK:${r.atk} DEF:${r.def} SPD:${r.speed} LUCK:${r.luck}`
+      ).join('\n');
+      const embed = new EmbedBuilder()
+        .setColor(0x1ABC9C)
+        .setTitle(`📖 Tu Tiên — Cảnh Giới (${cult.REALMS.length} cấp)`)
+        .setDescription(lines)
+        .setFooter({ text: 'Dùng ,tu để tu luyện, ,be-quan để bế quan' });
+      return message.reply({ embeds: [embed] });
+    }
+
+    if (['bag', 'tui-do', 'do', 'inventory'].includes(args[0])) {
+      const u = getUserData(message.author.id, message.author.username);
+      const inv = u.inventory || [];
+      if (inv.length === 0) return message.reply('🎒 Túi đồ trống rỗng!');
+
+      const counts = {};
+      for (const id of inv) {
+        counts[id] = (counts[id] || 0) + 1;
+      }
+      const lines = Object.entries(counts).map(([id, count]) => {
+        const item = cult.SHOP_ITEMS.find(i => i.id === id);
+        return `${item ? item.name : id} x${count}`;
+      });
+      const equip = (u.equipment || []).map(id => {
+        const item = cult.SHOP_ITEMS.find(i => i.id === id);
+        return item ? item.name : id;
+      }).join(', ') || 'Không có';
+
+      const embed = new EmbedBuilder()
+        .setColor(0x8E44AD)
+        .setTitle(`🎒 Túi Đồ — ${message.author.username}`)
+        .addFields(
+          { name: '📦 Vật phẩm', value: lines.join('\n') || 'Trống', inline: false },
+          { name: '👕 Đang mặc', value: equip, inline: false },
+        );
+      return message.reply({ embeds: [embed] });
+    }
+
+    if (args[0] === 'pk') {
+      if (args[1] === 'ok') {
+        const challenge = pkChallenges.get(message.author.id);
+        if (!challenge) return message.reply('Không có lời thách đấu nào!');
+        clearTimeout(challenge._timeout);
+        pkChallenges.delete(message.author.id);
+        const challenger = challenge.challenger;
+        const cData = getUserData(challenger.id, challenger.username);
+        const tData = getUserData(message.author.id, message.author.username);
+        return executePk(message, challenger, message.author, cData, tData);
+      }
+
+      const target = message.mentions.users.first();
+      if (!target) return message.reply('Tag người cần PK! VD: `,tl pk @người`');
+      if (target.id === message.author.id) return message.reply('Không thể PK chính mình!');
+      if (target.bot) return message.reply('Không thể PK bot!');
+      if (pkChallenges.has(target.id)) return message.reply('Người này đã có lời thách đấu!');
+      if (pkChallenges.has(message.author.id)) return message.reply('Bạn đã có lời thách đấu!');
+
+      const timeout = setTimeout(() => {
+        pkChallenges.delete(target.id);
+      }, PK_TIMEOUT * 1000);
+      pkChallenges.set(target.id, { challenger: message.author, challenged: target, _timeout: timeout });
+
+      return message.reply(`⚔️ **${message.author.username}** thách đấu **${target.username}**!\n⏳ ${target} hãy gõ \`${prefix}tl pk ok\` trong **${PK_TIMEOUT}s** để chấp nhận!`);
+    }
+
+    const u = getUserData(message.author.id, message.author.username);
+    const now = Math.floor(Date.now() / 1000);
+    const cooldown = COOLDOWN_CULTIVATE - (now - u.lastCultivate);
+    if (cooldown > 0) {
+      return message.reply(`⏳ Hãy chờ **${cooldown}s** nữa mới có thể tu luyện tiếp!`);
+    }
+    u.lastCultivate = now;
+    const realm = cult.getRealm(u.realm);
+    const gain = Math.floor(Math.random() * 20 + 10 + u.realm * 3);
+    const stones = Math.floor(Math.random() * 5 + 1 + u.realm);
+    u.exp += gain;
+    u.spiritStones += stones;
+    const oldRealm = u.realm;
+    while (u.realm < cult.REALMS.length - 1) {
+      const next = cult.getRealm(u.realm + 1);
+      if (u.exp >= next.expReq) {
+        u.realm++;
+        const newRealm = cult.getRealm(u.realm);
+        u.hp = newRealm.hp;
+        u.maxHp = newRealm.hp;
+      } else break;
+    }
+    saveData();
+    let msg = `✨ **${message.author.username}** ngồi thiền tu luyện!\n+${gain} exp, +${stones} LT`;
+    if (u.realm > oldRealm) {
+      msg += `\n🎉 **ĐỘT PHÁ!** Tấn thăng lên **${cult.getRealm(u.realm).name}**!`;
+    }
+    return message.reply(msg);
+  }
+
+  if (['tt', 'thong-tin'].includes(cmd)) {
+    const target = message.mentions.users.first() || message.author;
+    const u = getUserData(target.id, target.username);
+    const realm = cult.getRealm(u.realm);
+    const stats = cult.getTotalStats(u);
+    const prog = cult.calcProgress(u);
+    const barLen = 15;
+    const filled = Math.round(prog * barLen);
+    const bar = '█'.repeat(filled) + '░'.repeat(barLen - filled);
+    const equipNames = (u.equipment || [])
+      .map(id => { const it = cult.SHOP_ITEMS.find(i => i.id === id); return it ? it.name : id; })
+      .join(', ') || 'Không có';
+
+    const embed = new EmbedBuilder()
+      .setColor(0x9B59B6)
+      .setTitle(`👤 ${target.username} — Tu Tiên`)
+      .addFields(
+        { name: '🌀 Cảnh giới', value: realm.name, inline: true },
+        { name: '💎 LT', value: `${u.spiritStones}`, inline: true },
+        { name: '📊 Tu vi', value: `${u.exp} / ${cult.getRealm(u.realm + 1)?.expReq || 'MAX'}`, inline: false },
+        { name: '📈 Tiến triển', value: `\`${bar}\` ${(prog * 100).toFixed(1)}%`, inline: false },
+        { name: '❤️ HP', value: `${stats.hp}`, inline: true },
+        { name: '⚔️ ATK', value: `${stats.atk}`, inline: true },
+        { name: '🛡️ DEF', value: `${stats.def}`, inline: true },
+        { name: '💨 Speed', value: `${stats.speed}`, inline: true },
+        { name: '🍀 Luck', value: `${stats.luck}`, inline: true },
+        { name: '💥 Crit', value: `${(stats.crit * 100).toFixed(1)}%`, inline: true },
+        { name: '🏆 Chiến tích', value: `Thắng ${u.winCount} / Thua ${u.lossCount}`, inline: false },
+        { name: '🎒 Trang bị', value: equipNames, inline: false },
+      )
+      .setFooter({ text: 'Dùng ,tu-luyen để tu tập' });
+    return message.reply({ embeds: [embed] });
+  }
+
+  if (['bxh', 'bang-xep-hang'].includes(cmd)) {
+    const entries = Object.entries(data.users)
+      .sort((a, b) => b[1].realm - a[1].realm || b[1].exp - a[1].exp)
+      .slice(0, 10);
+    if (entries.length === 0) return message.reply('Chưa có ai tu luyện cả!');
+    const desc = entries.map(([id, u], i) => {
+      const realm = cult.getRealm(u.realm);
+      const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
+      return `${medal} **${u.name || 'Unknown'}** — ${realm.name} (${u.exp} exp)`;
+    }).join('\n');
+    const embed = new EmbedBuilder()
+      .setColor(0xF1C40F)
+      .setTitle('🏆 Bảng Xếp Hạng Tu Tiên')
+      .setDescription(desc);
+    return message.reply({ embeds: [embed] });
+  }
+
+
+
+  if (cmd === 'shop') {
+    const items = cult.SHOP_ITEMS.map((item, i) =>
+      `**${i + 1}.** ${item.name} — ${item.price} LT\n   └ ${item.desc}`
+    ).join('\n');
+    const embed = new EmbedBuilder()
+      .setColor(0xE67E22)
+      .setTitle('🏪 Cửa Hàng Tu Tiên')
+      .setDescription(items)
+      .setFooter({ text: `Dùng ,mua <tên hoặc số> — Bạn có: ${getUserData(message.author.id).spiritStones} LT` });
+    return message.reply({ embeds: [embed] });
+  }
+
+  if (cmd === 'mua') {
+    const u = getUserData(message.author.id, message.author.username);
+    const query = args.join(' ').toLowerCase();
+    if (!query) return message.reply('Ghi tên món cần mua! Xem ,shop');
+
+    const idx = parseInt(query);
+    let item;
+    if (!isNaN(idx) && idx >= 1 && idx <= cult.SHOP_ITEMS.length) {
+      item = cult.SHOP_ITEMS[idx - 1];
+    } else {
+      item = cult.SHOP_ITEMS.find(i => i.id === query || i.name.toLowerCase().includes(query));
+    }
+    if (!item) return message.reply('Món đó không có trong shop!');
+
+    if (u.spiritStones < item.price) return message.reply(`Bạn cần ${item.price} LT, chỉ có ${u.spiritStones} LT!`);
+
+    u.spiritStones -= item.price;
+    if (!u.inventory) u.inventory = [];
+    u.inventory.push(item.id);
+    saveData();
+    return message.reply(`✅ Đã mua **${item.name}** với giá ${item.price} LT! Kiểm tra \`${prefix}tl bag\``);
+  }
+
+  if (cmd === 'dung') {
+    const u = getUserData(message.author.id, message.author.username);
+    const query = args.join(' ').toLowerCase();
+    if (!query) return message.reply(`Dùng cái gì? Xem \`${prefix}tl bag\``);
+
+    const inv = u.inventory || [];
+    const idx = parseInt(query);
+    let itemId;
+    if (!isNaN(idx)) {
+      const realIdx = idx - 1;
+      if (realIdx < 0 || realIdx >= inv.length) return message.reply('Số thứ tự không hợp lệ!');
+      itemId = inv[realIdx];
+    } else {
+      const found = cult.SHOP_ITEMS.find(i => i.id === query || i.name.toLowerCase().includes(query));
+      if (!found) return message.reply('Vật phẩm không tồn tại!');
+      itemId = found.id;
+      const pos = inv.indexOf(itemId);
+      if (pos === -1) return message.reply('Bạn không có vật phẩm đó!');
+    }
+
+    const pos = inv.indexOf(itemId);
+    if (pos === -1) return message.reply('Bạn không có vật phẩm đó!');
+    inv.splice(pos, 1);
+
+    const item = cult.SHOP_ITEMS.find(i => i.id === itemId);
+    if (!item) return message.reply('Lỗi vật phẩm!');
+
+    if (item.exp) {
+      u.exp += item.exp;
+      while (u.realm < cult.REALMS.length - 1) {
+        const next = cult.getRealm(u.realm + 1);
+        if (u.exp >= next.expReq) {
+          u.realm++;
+          const newRealm = cult.getRealm(u.realm);
+          u.hp = newRealm.hp;
+          u.maxHp = newRealm.hp;
+        } else break;
+      }
+      saveData();
+      return message.reply(`🍃 Đã dùng **${item.name}**! Nhận +${item.exp} exp.`);
+    }
+    if (item.atkBonus) {
+      u.atkBonus = (u.atkBonus || 0) + item.atkBonus;
+      u.equipment = u.equipment || [];
+      u.equipment.push(itemId);
+      saveData();
+      return message.reply(`⚔️ Đã trang bị **${item.name}**! +${item.atkBonus} sát thương.`);
+    }
+    if (item.defBonus) {
+      u.defBonus = (u.defBonus || 0) + item.defBonus;
+      u.equipment = u.equipment || [];
+      u.equipment.push(itemId);
+      saveData();
+      return message.reply(`🛡️ Đã trang bị **${item.name}**! +${item.defBonus} phòng thủ.`);
+    }
+    return message.reply('Vật phẩm không thể dùng!');
+  }
+
+  if (['su-kien', 'tham-hiem', 'explore'].includes(cmd)) {
+    const u = getUserData(message.author.id, message.author.username);
+    const now = Math.floor(Date.now() / 1000);
+    const cooldown = COOLDOWN_EVENT - (now - u.lastEvent);
+    if (cooldown > 0) {
+      return message.reply(`⏳ Hãy chờ **${cooldown}s** nữa mới có thể thám hiểm!`);
+    }
+    u.lastEvent = now;
+    const event = cult.RANDOM_EVENTS[Math.floor(Math.random() * cult.RANDOM_EVENTS.length)];
+    if (event.includes('exp')) {
+      const expGain = parseInt(event.match(/\+\s*(\d+)\s*exp/)?.[1] || '0');
+      u.exp += expGain;
+      while (u.realm < cult.REALMS.length - 1) {
+        const next = cult.getRealm(u.realm + 1);
+        if (u.exp >= next.expReq) {
+          u.realm++;
+          const newRealm = cult.getRealm(u.realm);
+          u.hp = newRealm.hp;
+          u.maxHp = newRealm.hp;
+        } else break;
+      }
+    }
+    if (event.includes('LT')) {
+      const stoneGain = parseInt(event.match(/\+\s*(\d+)\s*LT/)?.[1] || '0');
+      u.spiritStones += stoneGain;
+    }
+    if (event.includes('mất')) {
+      const hpLoss = parseInt(event.match(/mất\s*(\d+)\s*HP/)?.[1] || '0');
+      u.hp = Math.max(0, (u.hp || u.maxHp) - hpLoss);
+    }
+    if (event.includes('hồi phục')) {
+      u.hp = u.maxHp;
+    }
+    saveData();
+    return message.reply(`🌍 **${message.author.username}** thám hiểm tu tiên!\n${event}`);
+  }
+
+  // === BE QUAN ===
+
+  if (['be-quan', 'bq', 'seclude'].includes(cmd)) {
+    const u = getUserData(message.author.id, message.author.username);
+    const now = Math.floor(Date.now() / 1000);
+
+    if (args[0] === 'end' || args[0] === 'finish' || args[0] === 'ket-thuc') {
+      if (!u.beQuanStart || u.beQuanStart === 0) {
+        return message.reply('Bạn chưa bế quan! Dùng `,tl start` hoặc `,be-quan` để bắt đầu.');
+      }
+      const elapsed = now - u.beQuanStart;
+      if (elapsed < BE_QUAN_MIN_INTERVAL) {
+        return message.reply(`⏳ Cần bế quan ít nhất **${BE_QUAN_MIN_INTERVAL}s** mới có kết quả!`);
+      }
+      const expGain = Math.floor(elapsed * (5 + u.realm * 5) / 60);
+      const ltGain = Math.floor(elapsed * (1 + u.realm * 2) / 60);
+      u.exp += expGain;
+      u.spiritStones += ltGain;
+      const realmBonus = Math.floor(elapsed / 3600 * (1 + u.realm * 0.3));
+      if (realmBonus > 0) {
+        u.atkBonus = (u.atkBonus || 0) + realmBonus;
+        u.defBonus = (u.defBonus || 0) + Math.floor(realmBonus / 2);
+      }
+      while (u.realm < cult.REALMS.length - 1) {
+        const next = cult.getRealm(u.realm + 1);
+        if (u.exp >= next.expReq) {
+          u.realm++;
+          const newRealm = cult.getRealm(u.realm);
+          u.hp = newRealm.hp;
+          u.maxHp = newRealm.hp;
+        } else break;
+      }
+      u.beQuanStart = 0;
+      saveData();
+      const hours = Math.floor(elapsed / 3600);
+      const mins = Math.floor((elapsed % 3600) / 60);
+      const secs = elapsed % 60;
+      const timeStr = hours > 0 ? `${hours}g ${mins}p ${secs}s` : mins > 0 ? `${mins}p ${secs}s` : `${secs}s`;
+      let msg = `🎉 **Xuất quan!** Bế quan **${timeStr}**\n+${expGain} exp, +${ltGain} LT`;
+      if (realmBonus > 0) msg += `\n⚔️ +${realmBonus} ATK, +${Math.floor(realmBonus / 2)} DEF`;
+      return message.reply(msg);
+    }
+
+    if (u.beQuanStart && u.beQuanStart > 0) {
+      const elapsed = now - u.beQuanStart;
+      const expGain = Math.floor(elapsed * (5 + u.realm * 5) / 60);
+      const ltGain = Math.floor(elapsed * (1 + u.realm * 2) / 60);
+      const hours = Math.floor(elapsed / 3600);
+      const mins = Math.floor((elapsed % 3600) / 60);
+      const secs = elapsed % 60;
+      const timeStr = hours > 0 ? `${hours}g ${mins}p ${secs}s` : mins > 0 ? `${mins}p ${secs}s` : `${secs}s`;
+      return message.reply(`🧘 **${message.author.username}** đang bế quan!\n⏳ Đã qua: **${timeStr}**\n📊 Tạm tính: +${expGain} exp, +${ltGain} LT\n📌 \`,be-quan end\` để xuất quan.`);
+    }
+
+    u.beQuanStart = now;
+    saveData();
+    return message.reply(`🧘 **${message.author.username}** bắt đầu bế quan!\n⏳ Càng lâu càng nhiều — \`,be-quan\` để kiểm tra, \`,tl stop\` / \`,be-quan end\` để xuất quan.`);
+  }
+});
+
+client.on('error', (err) => {
+  console.error('[CLIENT ERROR]', err);
+});
+
+client.once('ready', () => {
+  console.log(`Bot ${client.user.tag} đã online!`);
+  console.log(`Prefix hiện tại: ${data.prefix}`);
+  console.log(`Setup: ${data.setupDone ? 'Đã setup' : 'Chưa setup'}`);
+  console.log(`Số qtv: ${data.qtv.length}`);
+});
+
+client.login(process.env.TOKEN);
