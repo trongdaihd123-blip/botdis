@@ -1,6 +1,8 @@
 const { Client, GatewayIntentBits, EmbedBuilder, Routes, Partials } = require('discord.js');
 
 const sc = require('./soundcloud-api');
+const nct = require('./nhaccuatui-api');
+const axios = require('axios');
 const tuluyen = require('./tuluyen/index.cjs');
 const fs = require('fs');
 const path = require('path');
@@ -77,16 +79,34 @@ client.on('messageCreate', async (message) => {
       const num = parseInt(message.content);
       if (num >= 1 && num <= repliedSearch.tracks.length) {
         const track = repliedSearch.tracks[num - 1];
+        const platform = repliedSearch.platform || 'soundcloud';
         searches.delete(message.author.id);
 
         const statusMsg = await message.reply('Đang tải nhạc...');
         const tmpDir = '/tmp/opencode';
         if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
-        const tmpMp3 = path.join(tmpDir, `track_${track.id}.mp3`);
-        const tmpOgg = path.join(tmpDir, `track_${track.id}.ogg`);
+        const safeId = String(track.id ?? track.key ?? Date.now()).replace(/[^a-zA-Z0-9_-]/g, '_');
+        const tmpMp3 = path.join(tmpDir, `track_${platform}_${safeId}.mp3`);
+        const tmpOgg = path.join(tmpDir, `track_${platform}_${safeId}.ogg`);
 
         try {
-          await sc.downloadTrack(track.permalink_url, tmpMp3);
+          if (platform === 'nhaccuatui') {
+            if (!track.streamUrl) throw new Error('Bài này không có stream (có thể VIP), chọn bài khác!');
+            const dl = await axios.get(track.streamUrl, {
+              headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://www.nhaccuatui.com/' },
+              responseType: 'stream',
+              timeout: 120000,
+              maxRedirects: 5,
+            });
+            await new Promise((resolve, reject) => {
+              const w = fs.createWriteStream(tmpMp3);
+              dl.data.pipe(w);
+              w.on('finish', resolve);
+              w.on('error', reject);
+            });
+          } else {
+            await sc.downloadTrack(track.permalink_url, tmpMp3);
+          }
           await statusMsg.edit('Đang chuyển đổi...');
 
           await new Promise((resolve, reject) => {
@@ -106,22 +126,32 @@ client.on('messageCreate', async (message) => {
           await statusMsg.edit('Đang tải lên...');
           const oggBuf = fs.readFileSync(tmpOgg);
 
+          const isNct = platform === 'nhaccuatui';
           await message.channel.client.rest.post(Routes.channelMessages(message.channel.id), {
             body: {
-              attachments: [{ id: 0, filename: 'soundcloud.ogg', is_voice_message: true }],
+              attachments: [{ id: 0, filename: isNct ? 'nhaccuatui.ogg' : 'soundcloud.ogg', is_voice_message: true }],
             },
-            files: [{ data: oggBuf, name: 'soundcloud.ogg', contentType: 'audio/ogg' }],
+            files: [{ data: oggBuf, name: isNct ? 'nhaccuatui.ogg' : 'soundcloud.ogg', contentType: 'audio/ogg' }],
           });
 
-          const info = sc.extractTrackInfo(track);
-          const embed = new EmbedBuilder()
-            .setColor(0xFF5500)
-            .setTitle('Đã gửi voice message')
-            .setDescription(`[${info.title}](${info.permalinkUrl}) — ${info.username}`)
-            .setFooter({ text: `SoundCloud • ${info.duration}` });
-          if (info.artworkUrl) embed.setThumbnail(info.artworkUrl);
-
-          await statusMsg.edit({ content: '', embeds: [embed] });
+          if (isNct) {
+            const embed = new EmbedBuilder()
+              .setColor(0x1DB954)
+              .setTitle('Đã gửi voice message')
+              .setDescription(`[${track.title}](${track.songLink}) — ${track.artistsNames}`)
+              .setFooter({ text: `NhacCuaTui${track.isHD ? ' • HD' : ''}${track.isOfficial ? ' • Official' : ''}` });
+            if (track.thumbnail) embed.setThumbnail(track.thumbnail);
+            await statusMsg.edit({ content: '', embeds: [embed] });
+          } else {
+            const info = sc.extractTrackInfo(track);
+            const embed = new EmbedBuilder()
+              .setColor(0xFF5500)
+              .setTitle('Đã gửi voice message')
+              .setDescription(`[${info.title}](${info.permalinkUrl}) — ${info.username}`)
+              .setFooter({ text: `SoundCloud • ${info.duration}` });
+            if (info.artworkUrl) embed.setThumbnail(info.artworkUrl);
+            await statusMsg.edit({ content: '', embeds: [embed] });
+          }
         } catch (err) {
           await statusMsg.edit(`Lỗi: ${err.message}`);
         } finally {
@@ -215,9 +245,9 @@ client.on('messageCreate', async (message) => {
     return message.reply(`Đã đổi prefix thành \`${newPrefix}\``);
   }
 
-  if (cmd === 'music') {
+  if (['music', 'soundcloud', 'sc'].includes(cmd)) {
     const query = args.join(' ');
-    if (!query) return message.reply('Nhập tên bài hát!');
+    if (!query) return message.reply(`Nhập tên bài hát! VD: \`${prefix}soundcloud Sơn Tùng\``);
 
     const statusMsg = await message.reply('Đang tìm trên SoundCloud...');
 
@@ -244,12 +274,54 @@ client.on('messageCreate', async (message) => {
       const sent = await statusMsg.edit({ content: '', embeds: [embed] });
 
       searches.set(message.author.id, {
+        platform: 'soundcloud',
         tracks: results,
         messageId: sent.id,
       });
     } catch (err) {
       statusMsg.edit(`Lỗi: ${err.message}`);
     }
+    return;
+  }
+
+  if (['nhaccuatui', 'nct'].includes(cmd)) {
+    const query = args.join(' ');
+    if (!query) return message.reply(`Nhập tên bài hát! VD: \`${prefix}nhaccuatui Waiting For You\``);
+
+    const statusMsg = await message.reply('Đang tìm trên NhacCuaTui...');
+
+    try {
+      const results = await nct.searchSongs(query, 10);
+
+      if (!results || results.length === 0) {
+        return statusMsg.edit('Không tìm thấy kết quả!');
+      }
+
+      const desc = results
+        .map((t, i) => {
+          const dur = nct.formatDuration(t.duration);
+          const tag = [t.isOfficial ? 'Official' : null, t.isHD ? 'HD' : null].filter(Boolean).join(' • ');
+          return `**${i + 1}.** ${t.title} - ${t.artistsNames} [${dur}]${tag ? ` (${tag})` : ''}`;
+        })
+        .join('\n');
+
+      const embed = new EmbedBuilder()
+        .setColor(0x1DB954)
+        .setTitle('Kết quả NhacCuaTui')
+        .setDescription(desc)
+        .setFooter({ text: 'Reply số 1-10 để chọn bài' });
+
+      const sent = await statusMsg.edit({ content: '', embeds: [embed] });
+
+      searches.set(message.author.id, {
+        platform: 'nhaccuatui',
+        tracks: results,
+        messageId: sent.id,
+      });
+    } catch (err) {
+      statusMsg.edit(`Lỗi: ${err.message}`);
+    }
+    return;
   }
 
   if (['cmd', 'help', 'commands'].includes(cmd)) {
@@ -290,8 +362,9 @@ client.on('messageCreate', async (message) => {
         { name: '🔐 Hộ chiếu (nhắn RIÊNG cho bot)', value:
           `\`${prefix}tl dangky <tk> <mk>\` — Đăng ký (1 người/1 lần)\n` +
           `\`${prefix}tl login <tk> <mk>\` — Đăng nhập thiết bị khác` },
-        { name: '🎵 Nhạc', value:
-          `\`${prefix}music <tên>\` — Tìm nhạc SoundCloud\n` +
+        { name: '🎵 Nhạc (port từ bot2)', value:
+          `\`${prefix}soundcloud <tên>\` (alias: \`${prefix}music\`, \`${prefix}sc\`) — Tìm nhạc SoundCloud\n` +
+          `\`${prefix}nhaccuatui <tên>\` (alias: \`${prefix}nct\`) — Tìm nhạc NhacCuaTui\n` +
           `Reply số 1-10 vào kết quả để tải voice message` },
         { name: '🛡️ Quản trị', value:
           `\`${prefix}setup\` — Set đấng sáng thế (1 lần duy nhất)\n` +
