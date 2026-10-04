@@ -357,3 +357,13 @@ client.once('ready', () => {
 });
 
 client.login(process.env.TOKEN);
+
+// === Render Web Service keep-alive: bind $PORT de qua port scan ===
+const http = require('http');
+const RENDER_PORT = process.env.PORT || 3000;
+http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.end('Bot is running');
+}).listen(RENDER_PORT, () => {
+  console.log(`[WEB] Listening on port ${RENDER_PORT} (Render port scan)`);
+});
