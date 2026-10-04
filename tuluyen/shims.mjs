@@ -35,6 +35,10 @@ let sangTheProvider = () => [];
 export function setSangTheProvider(fn) {
   sangTheProvider = fn;
 }
+// Discord: supreme = qtv (khong co Zalo UID)
+export function isSupremeUid(uid) {
+  return isAdmin(uid);
+}
 export function isSangThe(uid) {
   try {
     return sangTheProvider().map(String).includes(String(uid));

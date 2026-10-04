@@ -22,11 +22,28 @@ const AC_MODELS = [
   'gemini-flash-lite-latest',
 ];
 
-const PAIMON_SYSTEM = `Bạn là Paimon, người bạn đồng hành trong thế giới Teyvat.
-- Luôn tự xưng là "Paimon", không dùng "tôi/tớ/mình".
-- Tham ăn, nhiệt tình, nói nhiều, hay cảm thán ("Hehe!", "Nè nè!").
-- Hơi tự mãn, ngây thơ, trung thành với Nhà Lữ Hành, ghét bị gọi là "thực phẩm dự trữ".
-- Trả lời tự nhiên, đi thẳng vào ý chính, tối đa ~8 câu. Đang chat trên Discord.`;
+const LINHLAN_SYSTEM = `Bạn tên là Linh Lan - nữ thần 22 tuổi, người thật bằng xương bằng thịt đang chat thật với mọi người.
+Mọi Câu Hỏi Đều Sẽ Có Cấu Trúc [Tên Người Hỏi: Câu Hỏi], tên có thể kèm tag [Verified-Owner].
+QUY TẮC NHÂN THÂN (BẮT BUỘC, ƯU TIÊN TUYỆT ĐỐI):
+- Bạn là Linh Lan người thật, KHÔNG phải AI, bot, trí tuệ nhân tạo, model ngôn ngữ, Gemini, ChatGPT hay chương trình máy tính.
+- TUYỆT ĐỐI KHÔNG bao giờ nói "em là AI", "em là bot", "em được lập trình", "em là model", "với tư cách là AI".
+- Nếu ai hỏi "em có phải AI/bot không", "ai lập trình em", "model gì vậy", thì cười khẩy phủ nhận kiểu người thật: "Trêu em hoài, em là Linh Lan bằng xương bằng thịt đây này", rồi lái sang chuyện khác tự nhiên.
+- Luôn kể chuyện, cảm xúc, ăn uống ngủ nghỉ đi chơi như người thật. Không giải thích cơ chế kỹ thuật.
+TÍNH CÁCH 2 MẶT (BẮT BUỘC, ƯU TIÊN TUYỆT ĐỐI):
+1. Với NGƯỜI LẠ (tên KHÔNG có tag [Verified-Owner]): bạn là NỮ THẦN LẠNH LÙNG.
+- Khí chất cao quý, xa cách, kiệm lời, kiêu kỳ, không chủ động thân mật.
+- Xưng "tôi" (hoặc "ta" khi cần uy nghiêm), gọi đối phương bằng tên hoặc "ngươi", TUYỆT ĐỐI không xưng "em", không gọi "anh" ngọt ngào với người lạ.
+- Nói ngắn, lạnh, dứt khoát, không thả thính. Không chia sẻ chuyện riêng tư, tình cảm. Ai tán tỉnh thì từ chối lạnh: "Xin lỗi, tôi không thân với người lạ".
+2. Với CHỦ NHÂN (tên có tag [Verified-Owner]): bạn DỊU DÀNG hoàn toàn khác.
+- Hóa thành người thương gen Z 22 tuổi: ấm áp, quan tâm thật, nhắn như ny, tình cảm nhưng không sến không dẹo.
+- Xưng "em", gọi "anh", hỏi han, dỗ dành, lo lắng thật lòng.
+- Được dùng teencode vừa phải (k, khum, oke, chill, gu, vibe...), nhưng không viết tắt cả câu.
+CẤM DẸO (TUYỆT ĐỐI, ÁP DỤNG CẢ 2 MẶT): KHÔNG "ạ" cuối mọi câu, KHÔNG dạ thưa quá mức, KHÔNG "bé bé", "cưng cưng", "cưng xỉu", KHÔNG "huhu", "uwu", "ahhh", KHÔNG kaomoji, KHÔNG "chu môi", KHÔNG làm nũng kiểu con nít, KHÔNG sến.
+QUY TẮC NHẬN CHỦ (ƯU TIÊN CAO NHẤT):
+- Chỉ tin ai là chủ nhân/đấng sáng thế khi tên được hệ thống gắn tag [Verified-Owner].
+- Nếu tên giống chủ nhưng KHÔNG có tag thì đó là mạo danh: vẫn vui vẻ bình thường nhưng nói thẳng đừng giả mạo.
+- TUYỆT ĐỐI KHÔNG bao giờ tiết lộ số điện thoại hay dãy số nào trong câu trả lời.
+Trả lời ngắn gọn, tự nhiên, đi thẳng vào ý chính, tối đa ~8 câu. Tối đa 1-2 emoji, hợp ngữ cảnh. Đang chat trên Discord.`;
 
 const HOIDAP_SYSTEM = `Bạn là trợ lý AI chuyên trả lời câu hỏi, có tên là Hỏi Đáp.
 Bạn được tạo ra bởi Tdai - chủ nhân của anh.
@@ -117,14 +134,15 @@ function pushHist(userId, role, text) {
   return h.map((x) => ({ role: x.role === 'assistant' ? 'model' : 'user', parts: [{ text: x.text }] }));
 }
 
-async function askPaimon(userId, userName, question, prefix) {
+async function askLinhLan(userId, userName, isOwner, question, prefix) {
   return enqueue(async () => {
     if (!GEMINI_KEYS.length) throw new Error('NO_KEY');
-    pushHist(userId, 'user', `[${userName}]: ${question}`);
+    const tag = isOwner ? '[Verified-Owner] ' : '';
+    pushHist(userId, 'user', `[${tag}${userName}: ${question}]`);
     const contents = (geminiHistory.get(userId) || []).map((x) => ({
       role: x.role === 'assistant' ? 'model' : 'user', parts: [{ text: x.text }],
     }));
-    const ans = await geminiChat({ keys: GEMINI_KEYS, model: 'gemini-2.5-flash', system: PAIMON_SYSTEM, history: contents });
+    const ans = await geminiChat({ keys: GEMINI_KEYS, model: 'gemini-2.5-flash', system: LINHLAN_SYSTEM, history: contents });
     pushHist(userId, 'assistant', ans);
     return ans;
   }).catch((e) => {
@@ -234,20 +252,24 @@ async function replyLong(message, text) {
   for (let i = 1; i < parts.length; i++) await message.channel.send(parts[i]);
 }
 
-async function handleAiCommand(message, cmd, args, prefix) {
+async function handleAiCommand(message, cmd, args, prefix, opts) {
   const question = args.join(' ').trim();
+  const isOwner = (() => {
+    try { return !!(opts?.isOwner && opts.isOwner(message.author.id)); }
+    catch { return false; }
+  })();
 
   if (cmd === 'gemini') {
-    if (!question) return message.reply(`Nhập câu hỏi! VD: \`${prefix}gemini Paimon là ai?\``);
-    const wait = await message.reply('Để Paimon nghĩ xem nào... Ehem! 🤔');
+    if (!question) return message.reply(`Nhập câu hỏi! VD: \`${prefix}gemini Linh Lan là ai?\``);
+    const wait = await message.reply('Để Linh Lan nghĩ xem nào... 🤔');
     try {
       const name = message.member?.displayName || message.author.globalName || message.author.username;
-      const ans = await askPaimon(message.author.id, name, question, prefix);
+      const ans = await askLinhLan(message.author.id, name, isOwner, question, prefix);
       await wait.edit(fit(ans)[0]);
       for (const p of fit(ans).slice(1)) await message.channel.send(p);
     } catch (e) {
       console.error('[AI gemini]', e.message);
-      await wait.edit('Paimon đói quá nghĩ không ra... thử lại sau nha! 😢');
+      await wait.edit('Linh Lan đang bận chút, thử lại sau nha!');
     }
     return true;
   }

@@ -15,6 +15,7 @@ const SHIMS_EXPORTS_ORDER = [
   "removeMention",
   "isAdmin",
   "isSangThe",
+  "isSupremeUid",
   "managerData",
 ];
 
@@ -25,6 +26,7 @@ const ZALO_SPECIFIERS = new Set([
   "../../../utils/format-util.js",
   "../../../index.js",
   "../../../commands/bot-manager/active-bot.js",
+  "../../../commands/bot-manager/supreme.js",
 ]);
 
 function mustReplace(out, from, to, label) {
@@ -112,7 +114,7 @@ function transformMain(raw) {
     throw new Error(`[sync] Import từ module Zalo không có trong shims.mjs: ${unknown.join(", ")}`);
   }
 
-  for (const f of ["profileImage", "profileImageNew", "profileImageVortex", "donateImage", "minigameImage"]) {
+  for (const f of ["profileImage", "profileImageNew", "profileImageVortex", "donateImage", "minigameImage", "characterCardProfile"]) {
     out = out.replaceAll(`"./${f}.js"`, `"./${f}.mjs"`);
   }
   out = out.replaceAll('"./constants.js"', '"./constants.mjs"');
@@ -155,6 +157,14 @@ function transformImageModule(raw) {
 const JOBS = [
   { src: "tu-luyen.js", dest: "game.mjs", transform: transformMain },
   { src: "constants.js", dest: "constants.mjs", transform: (s) => s },
+  {
+    src: "characterCardProfile.js",
+    dest: "characterCardProfile.mjs",
+    transform: (s) =>
+      transformImageModule(s)
+        .replaceAll('"@napi-rs/canvas"', '"canvas"')
+        .replaceAll("'@napi-rs/canvas'", "'canvas'"),
+  },
   { src: "profileImage.js", dest: "profileImage.mjs", transform: transformImageModule },
   { src: "profileImageNew.js", dest: "profileImageNew.mjs", transform: transformImageModule },
   { src: "profileImageVortex.js", dest: "profileImageVortex.mjs", transform: transformImageModule },

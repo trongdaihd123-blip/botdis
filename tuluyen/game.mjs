@@ -3,15 +3,14 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { createHash } from "crypto";
 import schedule from "node-schedule";
-import { MessageType, getGlobalPrefix, clearImagePath, removeMention, isAdmin, isSangThe, managerData } from "./shims.mjs";
+import { MessageType, getGlobalPrefix, clearImagePath, removeMention, isAdmin, isSangThe, isSupremeUid, managerData } from "./shims.mjs";
 import { generateProfileCard } from "./profileImage.mjs";
 import { generateProfileCard as generateProfileCardNew } from "./profileImageNew.mjs";
 import { generateProfileCardBlue } from "./profileImageVortex.mjs";
-import { generateProfileCardCharacter } from "./characterCardProfile.js";
+import { generateProfileCardCharacter } from "./characterCardProfile.mjs";
 import { generateTopRanking } from "./profileImage.mjs";
 import { generateDonateImage } from "./donateImage.mjs";
 import { generateMinigameBoxes } from "./minigameImage.mjs";
-import { isSupremeUid } from "../../../commands/bot-manager/supreme.js";
 
 // Ngoại lệ blockbot spam: chỉ adminHigh (list_admin) và supreme. AdminBot vẫn bị block như user thường.
 function isSpamBlockExempt(senderId) {

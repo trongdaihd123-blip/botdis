@@ -369,7 +369,7 @@ client.on('messageCreate', async (message) => {
           `\`${prefix}nhaccuatui <tên>\` (alias: \`${prefix}nct\`) — Tìm nhạc NhacCuaTui\n` +
           `Reply số 1-10 vào kết quả để tải voice message` },
         { name: '🤖 AI/Chat (như bot2)', value:
-          `\`${prefix}gemini <hỏi>\` — Paimon-Gemini (nhớ hội thoại)\n` +
+          `\`${prefix}gemini <hỏi>\` — Linh Lan (nhớ hội thoại, lạnh với người lạ)\n` +
           `\`${prefix}hoidap <hỏi>\` (alias \`${prefix}hd\`) — Trợ lý Hỏi Đáp\n` +
           `\`${prefix}ac <yêu cầu>\` — Gemini line dự phòng (tự xoay key+model)\n` +
           `\`${prefix}ai <hỏi>\` — AI local offline (thủ đô, khoa học, đổi đơn vị...)\n` +
@@ -430,7 +430,7 @@ client.on('messageCreate', async (message) => {
   // === AI/CHAT (port tu bot2) ===
   if (aichat.isAiCommand(cmd)) {
     try {
-      const handled = await aichat.handleAiCommand(message, cmd, args, prefix);
+      const handled = await aichat.handleAiCommand(message, cmd, args, prefix, { isOwner: (id) => isQtv(id) });
       if (handled) return;
     } catch (e) {
       console.error('[AICHAT]', e.message);
