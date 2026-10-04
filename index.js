@@ -368,10 +368,12 @@ client.on('messageCreate', async (message) => {
           `\`${prefix}soundcloud <tên>\` (alias: \`${prefix}music\`, \`${prefix}sc\`) — Tìm nhạc SoundCloud\n` +
           `\`${prefix}nhaccuatui <tên>\` (alias: \`${prefix}nct\`) — Tìm nhạc NhacCuaTui\n` +
           `Reply số 1-10 vào kết quả để tải voice message` },
-        { name: '🤖 AI/Chat', value:
-          `\`${prefix}ai <hỏi>\` (alias \`${prefix}gemini\`, \`${prefix}hoi\`) — Hỏi Paimon-Gemini\n` +
-          `\`${prefix}ds <hỏi>\` (alias \`${prefix}deepseek\`) — Hỏi DeepSeek\n` +
-          `\`${prefix}chat <nói gì đó>\` — Tám với Simsimi` },
+        { name: '🤖 AI/Chat (như bot2)', value:
+          `\`${prefix}gemini <hỏi>\` — Paimon-Gemini (nhớ hội thoại)\n` +
+          `\`${prefix}hoidap <hỏi>\` (alias \`${prefix}hd\`) — Trợ lý Hỏi Đáp\n` +
+          `\`${prefix}ac <yêu cầu>\` — Gemini line dự phòng (tự xoay key+model)\n` +
+          `\`${prefix}ai <hỏi>\` — AI local offline (thủ đô, khoa học, đổi đơn vị...)\n` +
+          `\`${prefix}gpt <hỏi>\` • \`${prefix}ds <hỏi>\` • \`${prefix}chat <tám>\` — GPT/DeepSeek/Simsimi` },
         { name: '😂 Troll (mỗi ngày reset)', value:
           `\`${prefix}gay [@user]\` • \`${prefix}deptrai [@user]\` • \`${prefix}uytin [@user]\`\n` +
           `\`${prefix}tay [@user]\` • \`${prefix}haihuoc [@user]\` • \`${prefix}danhphan [@user]\`\n` +
@@ -428,7 +430,7 @@ client.on('messageCreate', async (message) => {
   // === AI/CHAT (port tu bot2) ===
   if (aichat.isAiCommand(cmd)) {
     try {
-      const handled = await aichat.handleAiCommand(message, cmd, args);
+      const handled = await aichat.handleAiCommand(message, cmd, args, prefix);
       if (handled) return;
     } catch (e) {
       console.error('[AICHAT]', e.message);

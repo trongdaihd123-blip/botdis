@@ -1,14 +1,39 @@
 // Port tu /root/bot/bot2 qua Discord:
-// - gemini.js (Paimon, model gemini-2.5-flash) -> REST axios, khong can SDK
-// - api-crawl/assistant-ai/deepseek.js (API nemg, dich sang Viet)
-// - chat-bot/simsimi/simsimi-api.js (lenh chat)
+// - gemini-command.js (Paimon, xoay key) -> ,gemini
+// - hoidap-command.js (Hoi Dap) -> ,hoidap
+// - ac-command.js (key ALTP + chuoi model fallback) -> ,ac
+// - ai-command.js + local-ai (offline, khong key) -> ,ai
+// - content/gpt.js (nemg gpt4) -> ,gpt
+// - assistant-ai/deepseek.js -> ,ds | simsimi -> ,chat
 
 const axios = require('axios');
 
-const GEMINI_KEY = process.env.GEMINI_API_KEY || 'AIzaSyCsJ7pOVDNkjFx74JBz4hvrtbihSU6g_fE';
-const SIMSIMI_KEY = process.env.SIMSIMI_API_KEY || 'GZyOSYF-1Pr5bDnMZ-ng2bNQVbkvtH1OeJyNBjoi';
+const GEMINI_KEYS = [
+  process.env.GEMINI_API_KEY,
+  process.env.GEMINI_ALTP_BACKUP_API_KEY,
+  process.env.HOIDAP_API_KEY,
+  process.env.GEMINI_ALTP_API_KEY,
+].filter(Boolean);
 
-// Gioi han tin Discord (2000 ky tu) — cat nho hon de kem embed an toan
+const AC_MODELS = [
+  'gemini-2.5-flash',
+  'gemini-flash-latest',
+  'gemini-2.5-flash-lite',
+  'gemini-flash-lite-latest',
+];
+
+const PAIMON_SYSTEM = `Bạn là Paimon, người bạn đồng hành trong thế giới Teyvat.
+- Luôn tự xưng là "Paimon", không dùng "tôi/tớ/mình".
+- Tham ăn, nhiệt tình, nói nhiều, hay cảm thán ("Hehe!", "Nè nè!").
+- Hơi tự mãn, ngây thơ, trung thành với Nhà Lữ Hành, ghét bị gọi là "thực phẩm dự trữ".
+- Trả lời tự nhiên, đi thẳng vào ý chính, tối đa ~8 câu. Đang chat trên Discord.`;
+
+const HOIDAP_SYSTEM = `Bạn là trợ lý AI chuyên trả lời câu hỏi, có tên là Hỏi Đáp.
+Bạn được tạo ra bởi Tdai - chủ nhân của anh.
+Nhiệm vụ của anh là trả lời mọi câu hỏi một cách chính xác, ngắn gọn và dễ hiểu.
+Phong cách: lịch sự, thân thiện, đi thẳng vào vấn đề.
+Trả lời bằng tiếng Việt.`;
+
 const MAX_LEN = 1800;
 function fit(text) {
   const s = String(text ?? '').trim();
@@ -28,7 +53,6 @@ function fit(text) {
   return parts;
 }
 
-// ---- Hang doi chung tranh spam API ----
 const queue = [];
 let busy = false;
 function enqueue(task) {
@@ -52,41 +76,111 @@ async function pump() {
   busy = false;
 }
 
-// ---- Gemini (Paimon) ----
-const PAIMON_SYSTEM = `Bạn là Paimon, người bạn đồng hành trong thế giới Teyvat.
-- Luôn tự xưng là "Paimon", không dùng "tôi/tớ/mình".
-- Tham ăn, nhiệt tình, nói nhiều, hay cảm thán ("Hehe!", "Nè nè!").
-- Hơi tự mãn, ngây thơ, trung thành với Nhà Lữ Hành, ghét bị gọi là "thực phẩm dự trữ".
-- Trả lời tự nhiên, đi thẳng vào ý chính, tối đa ~8 câu. Đang chat trên Discord.`;
-const geminiHistory = new Map(); // userId -> [{role, text}]
+function noKeyMsg(prefix) {
+  return `Chưa cấu hình API key Gemini! Thêm env \`GEMINI_API_KEY\` (lấy free ở aistudio.google.com) rồi deploy lại nha.`;
+}
 
-async function askGemini(userId, question, userName) {
+// Goi Gemini REST, tu xoay key khi gap 400/403/404/429
+async function geminiChat({ keys, model, system, history }) {
+  if (!keys.length) throw new Error('NO_KEY');
+  let lastErr = null;
+  for (let k = 0; k < keys.length; k++) {
+    const key = keys[k];
+    try {
+      const { data } = await axios.post(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
+        {
+          system_instruction: { parts: [{ text: system }] },
+          contents: history,
+          generationConfig: { temperature: 0.9, topK: 40, topP: 0.8, maxOutputTokens: 600 },
+        },
+        { timeout: 30000 }
+      );
+      const text = data?.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('').trim();
+      if (!text) throw new Error('EMPTY');
+      return text;
+    } catch (e) {
+      lastErr = e;
+      const st = e.response?.status;
+      if (![400, 403, 404, 429].includes(st)) throw e;
+    }
+  }
+  throw lastErr;
+}
+
+const geminiHistory = new Map(); // userId -> [{role, text}]
+function pushHist(userId, role, text) {
+  const h = geminiHistory.get(userId) || [];
+  h.push({ role, text });
+  while (h.length > 20) h.shift();
+  geminiHistory.set(userId, h);
+  return h.map((x) => ({ role: x.role === 'assistant' ? 'model' : 'user', parts: [{ text: x.text }] }));
+}
+
+async function askPaimon(userId, userName, question, prefix) {
   return enqueue(async () => {
-    const hist = geminiHistory.get(userId) || [];
-    hist.push({ role: 'user', text: `[${userName}]: ${question}` });
-    while (hist.length > 20) hist.shift();
-    const contents = hist.map((h) => ({
-      role: h.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: h.text }],
+    if (!GEMINI_KEYS.length) throw new Error('NO_KEY');
+    pushHist(userId, 'user', `[${userName}]: ${question}`);
+    const contents = (geminiHistory.get(userId) || []).map((x) => ({
+      role: x.role === 'assistant' ? 'model' : 'user', parts: [{ text: x.text }],
     }));
-    const { data } = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`,
-      {
-        system_instruction: { parts: [{ text: PAIMON_SYSTEM }] },
-        contents,
-        generationConfig: { temperature: 0.9, topK: 40, topP: 0.8, maxOutputTokens: 600 },
-      },
-      { timeout: 30000 }
-    );
-    const text = data?.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('').trim();
-    if (!text) throw new Error('Gemini không trả lời');
-    hist.push({ role: 'assistant', text });
-    geminiHistory.set(userId, hist);
-    return text;
+    const ans = await geminiChat({ keys: GEMINI_KEYS, model: 'gemini-2.5-flash', system: PAIMON_SYSTEM, history: contents });
+    pushHist(userId, 'assistant', ans);
+    return ans;
+  }).catch((e) => {
+    if (e.message === 'NO_KEY') return noKeyMsg(prefix);
+    throw e;
   });
 }
 
-// ---- DeepSeek (nemg) + dich sang Viet ----
+async function askHoidap(question, prefix) {
+  return enqueue(async () => {
+    if (!GEMINI_KEYS.length) throw new Error('NO_KEY');
+    return geminiChat({
+      keys: GEMINI_KEYS, model: 'gemini-2.5-flash', system: HOIDAP_SYSTEM,
+      history: [{ role: 'user', parts: [{ text: question }] }],
+    });
+  }).catch((e) => {
+    if (e.message === 'NO_KEY') return noKeyMsg(prefix);
+    throw e;
+  });
+}
+
+// ,ac: xoay key + xoay model theo quota (giong ac-command goc)
+async function askAc(question, prefix) {
+  return enqueue(async () => {
+    if (!GEMINI_KEYS.length) throw new Error('NO_KEY');
+    let lastErr = null;
+    for (const model of AC_MODELS) {
+      try {
+        return await geminiChat({
+          keys: GEMINI_KEYS, model,
+          system: 'Bạn là trợ lý AI thân thiện, trả lời ngắn gọn bằng tiếng Việt. Đang chat trên Discord.',
+          history: [{ role: 'user', parts: [{ text: question }] }],
+        });
+      } catch (e) {
+        lastErr = e;
+        const st = e.response?.status;
+        if (![400, 403, 404, 429].includes(st)) throw e;
+      }
+    }
+    throw lastErr;
+  }).catch((e) => {
+    if (e.message === 'NO_KEY') return noKeyMsg(prefix);
+    throw e;
+  });
+}
+
+async function askGpt(question) {
+  return enqueue(async () => {
+    const res = await axios.get(
+      `https://api.nemg.me/gpt?type=gpt4&msg=${encodeURIComponent(question)}`,
+      { timeout: 30000 }
+    );
+    return res.data?.ketQua?.result || 'Không có kết quả trả về từ API.';
+  });
+}
+
 async function translateVI(text) {
   try {
     const res = await axios.get('https://translate.googleapis.com/translate_a/single', {
@@ -104,12 +198,12 @@ async function askDeepSeek(question) {
       `https://api.nemg.me/gpt?type=deepseekai&msg=${encodeURIComponent(question)}`,
       { timeout: 30000 }
     );
-    let ans = res.data?.ketQua?.result || 'Không có kết quả trả về từ API.';
+    const ans = res.data?.ketQua?.result || 'Không có kết quả trả về từ API.';
     return translateVI(ans);
   });
 }
 
-// ---- Simsimi ----
+const SIMSIMI_KEY = process.env.SIMSIMI_API_KEY || 'GZyOSYF-1Pr5bDnMZ-ng2bNQVbkvtH1OeJyNBjoi';
 async function askSimsimi(text) {
   return enqueue(async () => {
     const res = await axios.post(
@@ -123,7 +217,15 @@ async function askSimsimi(text) {
   });
 }
 
-const COMMANDS = ['ai', 'gemini', 'hoi', 'deepseek', 'ds', 'chat', 'simsimi'];
+// Local AI offline (port local-ai/engine.mjs)
+let localEngine = null;
+async function askLocal(question) {
+  if (!localEngine) localEngine = await import('./localai/engine.mjs');
+  const r = await localEngine.processAIQuestion(question);
+  return r.text;
+}
+
+const COMMANDS = ['gemini', 'hoidap', 'hd', 'ac', 'ai', 'gpt', 'deepseek', 'ds', 'chat', 'simsimi'];
 const isAiCommand = (cmd) => COMMANDS.includes(cmd);
 
 async function replyLong(message, text) {
@@ -132,14 +234,15 @@ async function replyLong(message, text) {
   for (let i = 1; i < parts.length; i++) await message.channel.send(parts[i]);
 }
 
-async function handleAiCommand(message, cmd, args) {
+async function handleAiCommand(message, cmd, args, prefix) {
   const question = args.join(' ').trim();
-  if (cmd === 'ai' || cmd === 'gemini' || cmd === 'hoi') {
-    if (!question) return message.reply('Nhập câu hỏi! VD: `,ai Paimon là ai?`');
+
+  if (cmd === 'gemini') {
+    if (!question) return message.reply(`Nhập câu hỏi! VD: \`${prefix}gemini Paimon là ai?\``);
     const wait = await message.reply('Để Paimon nghĩ xem nào... Ehem! 🤔');
     try {
       const name = message.member?.displayName || message.author.globalName || message.author.username;
-      const ans = await askGemini(message.author.id, question, name);
+      const ans = await askPaimon(message.author.id, name, question, prefix);
       await wait.edit(fit(ans)[0]);
       for (const p of fit(ans).slice(1)) await message.channel.send(p);
     } catch (e) {
@@ -148,8 +251,56 @@ async function handleAiCommand(message, cmd, args) {
     }
     return true;
   }
+  if (cmd === 'hoidap' || cmd === 'hd') {
+    if (!question) return message.reply(`Nhập câu hỏi! VD: \`${prefix}hoidap thủ đô của Lào là gì?\``);
+    const wait = await message.reply('Đang hỏi Hỏi Đáp... ⏳');
+    try {
+      await replyLong(message, await askHoidap(question, prefix));
+      try { await wait.delete(); } catch {}
+    } catch (e) {
+      console.error('[AI hoidap]', e.message);
+      await wait.edit('Có lỗi khi hỏi Hỏi Đáp, thử lại sau nha! 😢');
+    }
+    return true;
+  }
+  if (cmd === 'ac') {
+    if (!question) return message.reply(`Nhập yêu cầu! VD: \`${prefix}ac viết thơ về mưa\``);
+    const wait = await message.reply('Đang xử lý ⏳');
+    try {
+      await replyLong(message, await askAc(question, prefix));
+      try { await wait.delete(); } catch {}
+    } catch (e) {
+      console.error('[AI ac]', e.message);
+      await wait.edit('Cả dàn key/model đều bận, thử lại sau nha! 😢');
+    }
+    return true;
+  }
+  if (cmd === 'ai') {
+    if (!question) return message.reply(`Nhập câu hỏi! VD: \`${prefix}ai thủ đô của Việt Nam là gì?\``);
+    const wait = await message.reply('AI local đang suy nghĩ... ⏳');
+    try {
+      await replyLong(message, await askLocal(question));
+      try { await wait.delete(); } catch {}
+    } catch (e) {
+      console.error('[AI local]', e.message);
+      await wait.edit('Mình chưa hiểu câu hỏi này, diễn đạt lại giúp mình nhé!');
+    }
+    return true;
+  }
+  if (cmd === 'gpt') {
+    if (!question) return message.reply(`Nhập câu hỏi! VD: \`${prefix}gpt kể chuyện cười\``);
+    const wait = await message.reply('Đang hỏi GPT... ⏳');
+    try {
+      await replyLong(message, await askGpt(question));
+      try { await wait.delete(); } catch {}
+    } catch (e) {
+      console.error('[AI gpt]', e.message);
+      await wait.edit('Có lỗi khi hỏi GPT, thử lại sau nha! 😢');
+    }
+    return true;
+  }
   if (cmd === 'deepseek' || cmd === 'ds') {
-    if (!question) return message.reply('Nhập câu hỏi! VD: `,ds giải thích hố đen`');
+    if (!question) return message.reply(`Nhập câu hỏi! VD: \`${prefix}ds giải thích hố đen\``);
     const wait = await message.reply('Đang hỏi DeepSeek... ⏳');
     try {
       await replyLong(message, await askDeepSeek(question));
@@ -161,7 +312,7 @@ async function handleAiCommand(message, cmd, args) {
     return true;
   }
   if (cmd === 'chat' || cmd === 'simsimi') {
-    if (!question) return message.reply('Nhập nội dung trò chuyện! VD: `,chat xin chào`');
+    if (!question) return message.reply(`Nhập nội dung trò chuyện! VD: \`${prefix}chat xin chào\``);
     try {
       const ans = await askSimsimi(question);
       await message.reply(`Sim: ${ans}`);

@@ -1,0 +1,2530 @@
+{
+  "version": "1.1.0",
+  "description": "Kho tri thức nội bộ cho lệnh .AI — 100% offline, không cần API key. Câu nào có sẵn thì trả ngay, vượt mới tìm Internet.",
+  "qa": [
+    {
+      "id": "capital-vn",
+      "patterns": [
+        "thủ đô của việt nam là gì",
+        "thủ đô việt nam",
+        "thủ đô nước việt nam",
+        "viet nam thu do",
+        "ha noi co phai thu do"
+      ],
+      "answer": "Thủ đô của Việt Nam là Hà Nội."
+    },
+    {
+      "id": "country-vn-basic",
+      "patterns": [
+        "việt nam ở đâu",
+        "việt nam thuộc châu nào",
+        "việt nam nằm ở đâu"
+      ],
+      "answer": "Việt Nam nằm ở khu vực Đông Nam Á, trên bán đảo Đông Dương, giáp Trung Quốc, Lào, Campuchia và Biển Đông."
+    },
+    {
+      "id": "capital-world",
+      "patterns": [
+        "thủ đô của pháp là gì",
+        "thủ đô pháp",
+        "paris có phải thủ đô pháp"
+      ],
+      "answer": "Thủ đô của Pháp là Paris."
+    },
+    {
+      "id": "capital-japan",
+      "patterns": [
+        "thủ đô của nhật là gì",
+        "thủ đô nhật bản",
+        "thủ đô của nhật bản là gì"
+      ],
+      "answer": "Thủ đô của Nhật Bản là Tokyo."
+    },
+    {
+      "id": "capital-usa",
+      "patterns": [
+        "thủ đô của mỹ là gì",
+        "thủ đô nước mỹ",
+        "thủ đô hoa kỳ"
+      ],
+      "answer": "Thủ đô của Hoa Kỳ là Washington, D.C."
+    },
+    {
+      "id": "capital-england",
+      "patterns": [
+        "thủ đô của anh là gì",
+        "thủ đô nước anh",
+        "thủ đô vương quốc anh"
+      ],
+      "answer": "Thủ đô của Vương quốc Anh là London."
+    },
+    {
+      "id": "capital-china",
+      "patterns": [
+        "thủ đô của trung quốc là gì",
+        "thủ đô trung quốc"
+      ],
+      "answer": "Thủ đô của Trung Quốc là Bắc Kinh."
+    },
+    {
+      "id": "capital-korea",
+      "patterns": [
+        "thủ đô của hàn quốc là gì",
+        "thủ đô hàn quốc",
+        "thủ đô của hàn là gì"
+      ],
+      "answer": "Thủ đô của Hàn Quốc là Seoul."
+    },
+    {
+      "id": "capital-thailand",
+      "patterns": [
+        "thủ đô của thái lan là gì",
+        "thủ đô thái lan"
+      ],
+      "answer": "Thủ đô của Thái Lan là Bangkok."
+    },
+    {
+      "id": "capital-laos",
+      "patterns": [
+        "thủ đô của lào là gì",
+        "thủ đô lào"
+      ],
+      "answer": "Thủ đô của Lào là Viêng Chăn (Vientiane)."
+    },
+    {
+      "id": "capital-cambodia",
+      "patterns": [
+        "thủ đô của campuchia là gì",
+        "thủ đô campuchia"
+      ],
+      "answer": "Thủ đô của Campuchia là Phnom Penh."
+    },
+    {
+      "id": "greeting",
+      "patterns": [
+        "xin chào",
+        "chào bạn",
+        "chào bot",
+        "hello",
+        "hi",
+        "hey",
+        "chào buổi sáng",
+        "chào buổi tối"
+      ],
+      "answer": "Xin chào! Mình là AI nội bộ của bot. Bạn hỏi gì cứ dùng .AI <câu hỏi> nhé."
+    },
+    {
+      "id": "who-are-you",
+      "patterns": [
+        "bạn là ai",
+        "bạn tên gì",
+        "bot tên gì",
+        "giới thiệu bản thân",
+        "bạn là bot gì"
+      ],
+      "answer": "Mình là AI chatbot nội bộ của bot, chạy offline ngay trong project, không dùng API/token của bên thứ ba. Trong phạm vi kiến thức có sẵn mình trả lời ngay; ngoài phạm vi thì mình nhận là không biết."
+    },
+    {
+      "id": "who-made-you",
+      "patterns": [
+        "ai tạo ra bạn",
+        "ai tao ra ban",
+        "người tạo ra bạn là ai",
+        "tác giả của bạn"
+      ],
+      "answer": "Mình được tích hợp trực tiếp vào project bot này dưới dạng module local-ai, do đội ngũ phát triển bot xây dựng."
+    },
+    {
+      "id": "help",
+      "patterns": [
+        "bạn giúp được gì",
+        "bạn làm được gì",
+        "hướng dẫn sử dụng",
+        "cách dùng ai",
+        "lệnh ai dùng thế nào"
+      ],
+      "answer": "Bạn dùng: .AI <câu hỏi>. Ví dụ: .AI thủ đô của Đức là gì? Mình trả lời kiến thức có sẵn, đổi đơn vị, làm toán, xem giờ, đếm ngược ngày lễ. Câu nào ngoài kiến thức thì mình sẽ nói rõ là không biết."
+    },
+    {
+      "id": "math-help",
+      "patterns": [
+        "bạn có tính toán được không",
+        "bạn có biết tính toán",
+        "tính giúp tôi"
+      ],
+      "answer": "Mình tính được phép cộng/trừ/nhân/chia cơ bản. Ví dụ: .AI 12 * (3 + 4) hoặc .AI 100 chia 4 bằng mấy?"
+    },
+    {
+      "id": "vn-independence",
+      "patterns": [
+        "quốc khánh việt nam ngày nào",
+        "ngày quốc khánh việt nam",
+        "2/9 là ngày gì"
+      ],
+      "answer": "Ngày Quốc khánh Việt Nam là 2/9 (ngày 2 tháng 9 năm 1945, Chủ tịch Hồ Chí Minh đọc Tuyên ngôn Độc lập)."
+    },
+    {
+      "id": "vn-teacher-day",
+      "patterns": [
+        "ngày nhà giáo việt nam",
+        "20/11 là ngày gì"
+      ],
+      "answer": "Ngày Nhà giáo Việt Nam là 20/11 hằng năm."
+    },
+    {
+      "id": "vn-women-day",
+      "patterns": [
+        "8/3 là ngày gì",
+        "ngày quốc tế phụ nữ",
+        "20/10 là ngày gì"
+      ],
+      "answer": "8/3 là Ngày Quốc tế Phụ nữ; 20/10 là Ngày Phụ nữ Việt Nam."
+    },
+    {
+      "id": "water-boil",
+      "patterns": [
+        "nước sôi ở bao nhiêu độ",
+        "nhiệt độ sôi của nước"
+      ],
+      "answer": "Nước tinh khiết sôi ở 100°C ở áp suất khí quyển tiêu chuẩn (mực nước biển)."
+    },
+    {
+      "id": "pi",
+      "patterns": [
+        "số pi bằng bao nhiêu",
+        "pi bằng mấy",
+        "giá trị số pi"
+      ],
+      "answer": "Số Pi ≈ 3.14159."
+    },
+    {
+      "id": "light-speed",
+      "patterns": [
+        "tốc độ ánh sáng",
+        "vận tốc ánh sáng là bao nhiêu"
+      ],
+      "answer": "Tốc độ ánh sáng trong chân không ≈ 299.792.458 m/s."
+    },
+    {
+      "id": "solar-system",
+      "patterns": [
+        "hệ mặt trời có mấy hành tinh",
+        "có bao nhiêu hành tinh"
+      ],
+      "answer": "Hệ Mặt Trời có 8 hành tinh: Sao Thủy, Sao Kim, Trái Đất, Sao Hỏa, Sao Mộc, Sao Thổ, Sao Thiên Vương, Sao Hải Vương."
+    },
+    {
+      "id": "largest-ocean",
+      "patterns": [
+        "đại dương lớn nhất",
+        "đại dương nào lớn nhất thế giới"
+      ],
+      "answer": "Đại dương lớn nhất thế giới là Thái Bình Dương."
+    },
+    {
+      "id": "longest-river-vn",
+      "patterns": [
+        "sông dài nhất việt nam",
+        "sông nào dài nhất việt nam"
+      ],
+      "answer": "Sông dài nhất chảy qua Việt Nam là sông Mê Kông (đoạn qua Việt Nam gọi là sông Cửu Long); sông dài nhất hoàn toàn trong lãnh thổ Việt Nam thường kể đến sông Đồng Nai."
+    },
+    {
+      "id": "vietnam-population-note",
+      "volatile": true,
+      "patterns": [
+        "dân số việt nam",
+        "việt nam có bao nhiêu dân"
+      ],
+      "answer": "Dân số Việt Nam khoảng hơn 100 triệu người (số liệu thay đổi theo từng năm)."
+    },
+    {
+      "id": "thank-you",
+      "patterns": [
+        "cảm ơn",
+        "cam on",
+        "cảm ơn bạn",
+        "thank you",
+        "thanks"
+      ],
+      "answer": "Không có gì! Cần gì cứ hỏi mình bằng .AI nhé."
+    },
+    {
+      "id": "bye",
+      "patterns": [
+        "tạm biệt",
+        "bye",
+        "hẹn gặp lại"
+      ],
+      "answer": "Tạm biệt bạn! Hẹn gặp lại."
+    },
+    {
+      "id": "capital-germany",
+      "patterns": [
+        "thủ đô của Đức là gì",
+        "thủ đô Đức",
+        "Đức thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Đức là Berlin."
+    },
+    {
+      "id": "capital-italy",
+      "patterns": [
+        "thủ đô của Ý là gì",
+        "thủ đô Ý",
+        "Ý thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Ý là Rome (Roma)."
+    },
+    {
+      "id": "capital-spain",
+      "patterns": [
+        "thủ đô của Tây Ban Nha là gì",
+        "thủ đô Tây Ban Nha",
+        "Tây Ban Nha thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Tây Ban Nha là Madrid."
+    },
+    {
+      "id": "capital-portugal",
+      "patterns": [
+        "thủ đô của Bồ Đào Nha là gì",
+        "thủ đô Bồ Đào Nha",
+        "Bồ Đào Nha thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Bồ Đào Nha là Lisbon."
+    },
+    {
+      "id": "capital-netherlands",
+      "patterns": [
+        "thủ đô của Hà Lan là gì",
+        "thủ đô Hà Lan",
+        "Hà Lan thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Hà Lan là Amsterdam."
+    },
+    {
+      "id": "capital-belgium",
+      "patterns": [
+        "thủ đô của Bỉ là gì",
+        "thủ đô Bỉ",
+        "Bỉ thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Bỉ là Brussels."
+    },
+    {
+      "id": "capital-switzerland",
+      "patterns": [
+        "thủ đô của Thụy Sĩ là gì",
+        "thủ đô Thụy Sĩ",
+        "Thụy Sĩ thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Thụy Sĩ là Bern."
+    },
+    {
+      "id": "capital-austria",
+      "patterns": [
+        "thủ đô của Áo là gì",
+        "thủ đô Áo",
+        "Áo thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Áo là Vienna."
+    },
+    {
+      "id": "capital-poland",
+      "patterns": [
+        "thủ đô của Ba Lan là gì",
+        "thủ đô Ba Lan",
+        "Ba Lan thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Ba Lan là Warsaw (Vácsava)."
+    },
+    {
+      "id": "capital-czech",
+      "patterns": [
+        "thủ đô của Séc là gì",
+        "thủ đô Séc",
+        "Séc thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Séc là Prague."
+    },
+    {
+      "id": "capital-slovakia",
+      "patterns": [
+        "thủ đô của Slovakia là gì",
+        "thủ đô Slovakia",
+        "Slovakia thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Slovakia là Bratislava."
+    },
+    {
+      "id": "capital-hungary",
+      "patterns": [
+        "thủ đô của Hungary là gì",
+        "thủ đô Hungary",
+        "Hungary thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Hungary là Budapest."
+    },
+    {
+      "id": "capital-greece",
+      "patterns": [
+        "thủ đô của Hy Lạp là gì",
+        "thủ đô Hy Lạp",
+        "Hy Lạp thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Hy Lạp là Athens."
+    },
+    {
+      "id": "capital-turkey",
+      "patterns": [
+        "thủ đô của Thổ Nhĩ Kỳ là gì",
+        "thủ đô Thổ Nhĩ Kỳ",
+        "Thổ Nhĩ Kỳ thủ đô ở đâu",
+        "thủ đô thổ nhĩ kỳ"
+      ],
+      "answer": "Thủ đô của Thổ Nhĩ Kỳ là Ankara."
+    },
+    {
+      "id": "capital-russia",
+      "patterns": [
+        "thủ đô của Nga là gì",
+        "thủ đô Nga",
+        "Nga thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Nga là Moscow (Mát-xcơ-va)."
+    },
+    {
+      "id": "capital-ukraine",
+      "patterns": [
+        "thủ đô của Ukraine là gì",
+        "thủ đô Ukraine",
+        "Ukraine thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Ukraine là Kyiv (Kiev)."
+    },
+    {
+      "id": "capital-belarus",
+      "patterns": [
+        "thủ đô của Belarus là gì",
+        "thủ đô Belarus",
+        "Belarus thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Belarus là Minsk."
+    },
+    {
+      "id": "capital-romania",
+      "patterns": [
+        "thủ đô của Romania là gì",
+        "thủ đô Romania",
+        "Romania thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Romania là Bucharest."
+    },
+    {
+      "id": "capital-bulgaria",
+      "patterns": [
+        "thủ đô của Bulgaria là gì",
+        "thủ đô Bulgaria",
+        "Bulgaria thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Bulgaria là Sofia."
+    },
+    {
+      "id": "capital-serbia",
+      "patterns": [
+        "thủ đô của Serbia là gì",
+        "thủ đô Serbia",
+        "Serbia thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Serbia là Belgrade."
+    },
+    {
+      "id": "capital-croatia",
+      "patterns": [
+        "thủ đô của Croatia là gì",
+        "thủ đô Croatia",
+        "Croatia thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Croatia là Zagreb."
+    },
+    {
+      "id": "capital-ireland",
+      "patterns": [
+        "thủ đô của Ireland là gì",
+        "thủ đô Ireland",
+        "Ireland thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Ireland là Dublin."
+    },
+    {
+      "id": "capital-iceland",
+      "patterns": [
+        "thủ đô của Iceland là gì",
+        "thủ đô Iceland",
+        "Iceland thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Iceland là Reykjavik."
+    },
+    {
+      "id": "capital-norway",
+      "patterns": [
+        "thủ đô của Na Uy là gì",
+        "thủ đô Na Uy",
+        "Na Uy thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Na Uy là Oslo."
+    },
+    {
+      "id": "capital-sweden",
+      "patterns": [
+        "thủ đô của Thụy Điển là gì",
+        "thủ đô Thụy Điển",
+        "Thụy Điển thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Thụy Điển là Stockholm."
+    },
+    {
+      "id": "capital-finland",
+      "patterns": [
+        "thủ đô của Phần Lan là gì",
+        "thủ đô Phần Lan",
+        "Phần Lan thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Phần Lan là Helsinki."
+    },
+    {
+      "id": "capital-denmark",
+      "patterns": [
+        "thủ đô của Đan Mạch là gì",
+        "thủ đô Đan Mạch",
+        "Đan Mạch thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Đan Mạch là Copenhagen."
+    },
+    {
+      "id": "capital-vatican",
+      "patterns": [
+        "thủ đô của Vatican là gì",
+        "thủ đô Vatican",
+        "Vatican thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Vatican là Thành phố Vatican."
+    },
+    {
+      "id": "capital-india",
+      "patterns": [
+        "thủ đô của Ấn Độ là gì",
+        "thủ đô Ấn Độ",
+        "Ấn Độ thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Ấn Độ là New Delhi."
+    },
+    {
+      "id": "capital-pakistan",
+      "patterns": [
+        "thủ đô của Pakistan là gì",
+        "thủ đô Pakistan",
+        "Pakistan thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Pakistan là Islamabad."
+    },
+    {
+      "id": "capital-bangladesh",
+      "patterns": [
+        "thủ đô của Bangladesh là gì",
+        "thủ đô Bangladesh",
+        "Bangladesh thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Bangladesh là Dhaka."
+    },
+    {
+      "id": "capital-nepal",
+      "patterns": [
+        "thủ đô của Nepal là gì",
+        "thủ đô Nepal",
+        "Nepal thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Nepal là Kathmandu."
+    },
+    {
+      "id": "capital-srilanka",
+      "patterns": [
+        "thủ đô của Sri Lanka là gì",
+        "thủ đô Sri Lanka",
+        "Sri Lanka thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Sri Lanka là Colombo."
+    },
+    {
+      "id": "capital-mongolia",
+      "patterns": [
+        "thủ đô của Mông Cổ là gì",
+        "thủ đô Mông Cổ",
+        "Mông Cổ thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Mông Cổ là Ulaanbaatar."
+    },
+    {
+      "id": "capital-northkorea",
+      "patterns": [
+        "thủ đô của Triều Tiên là gì",
+        "thủ đô Triều Tiên",
+        "Triều Tiên thủ đô ở đâu",
+        "thủ đô bắc triều tiên",
+        "thủ đô triều tiên"
+      ],
+      "answer": "Thủ đô của Triều Tiên là Pyongyang (Bình Nhưỡng)."
+    },
+    {
+      "id": "capital-taiwan",
+      "patterns": [
+        "thủ đô của Đài Loan là gì",
+        "thủ đô Đài Loan",
+        "Đài Loan thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Đài Loan là Đài Bắc."
+    },
+    {
+      "id": "capital-indonesia",
+      "patterns": [
+        "thủ đô của Indonesia là gì",
+        "thủ đô Indonesia",
+        "Indonesia thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Indonesia là Jakarta."
+    },
+    {
+      "id": "capital-malaysia",
+      "patterns": [
+        "thủ đô của Malaysia là gì",
+        "thủ đô Malaysia",
+        "Malaysia thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Malaysia là Kuala Lumpur."
+    },
+    {
+      "id": "capital-singapore",
+      "patterns": [
+        "thủ đô của Singapore là gì",
+        "thủ đô Singapore",
+        "Singapore thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Singapore là Singapore."
+    },
+    {
+      "id": "capital-philippines",
+      "patterns": [
+        "thủ đô của Philippines là gì",
+        "thủ đô Philippines",
+        "Philippines thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Philippines là Manila."
+    },
+    {
+      "id": "capital-myanmar",
+      "patterns": [
+        "thủ đô của Myanmar là gì",
+        "thủ đô Myanmar",
+        "Myanmar thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Myanmar là Nay Pyi Taw."
+    },
+    {
+      "id": "capital-brunei",
+      "patterns": [
+        "thủ đô của Brunei là gì",
+        "thủ đô Brunei",
+        "Brunei thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Brunei là Bandar Seri Begawan."
+    },
+    {
+      "id": "capital-timor",
+      "patterns": [
+        "thủ đô của Đông Timor là gì",
+        "thủ đô Đông Timor",
+        "Đông Timor thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Đông Timor là Dili."
+    },
+    {
+      "id": "capital-afghanistan",
+      "patterns": [
+        "thủ đô của Afghanistan là gì",
+        "thủ đô Afghanistan",
+        "Afghanistan thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Afghanistan là Kabul."
+    },
+    {
+      "id": "capital-iran",
+      "patterns": [
+        "thủ đô của Iran là gì",
+        "thủ đô Iran",
+        "Iran thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Iran là Tehran."
+    },
+    {
+      "id": "capital-iraq",
+      "patterns": [
+        "thủ đô của Iraq là gì",
+        "thủ đô Iraq",
+        "Iraq thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Iraq là Baghdad."
+    },
+    {
+      "id": "capital-saudi",
+      "patterns": [
+        "thủ đô của Ả Rập Xê Út là gì",
+        "thủ đô Ả Rập Xê Út",
+        "Ả Rập Xê Út thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Ả Rập Xê Út là Riyadh."
+    },
+    {
+      "id": "capital-uae",
+      "patterns": [
+        "thủ đô của UAE là gì",
+        "thủ đô UAE",
+        "UAE thủ đô ở đâu",
+        "thủ đô các tiểu vương quốc ả rập"
+      ],
+      "answer": "Thủ đô của UAE là Abu Dhabi."
+    },
+    {
+      "id": "capital-qatar",
+      "patterns": [
+        "thủ đô của Qatar là gì",
+        "thủ đô Qatar",
+        "Qatar thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Qatar là Doha."
+    },
+    {
+      "id": "capital-kuwait",
+      "patterns": [
+        "thủ đô của Kuwait là gì",
+        "thủ đô Kuwait",
+        "Kuwait thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Kuwait là Kuwait City."
+    },
+    {
+      "id": "capital-kazakhstan",
+      "patterns": [
+        "thủ đô của Kazakhstan là gì",
+        "thủ đô Kazakhstan",
+        "Kazakhstan thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Kazakhstan là Astana."
+    },
+    {
+      "id": "capital-uzbekistan",
+      "patterns": [
+        "thủ đô của Uzbekistan là gì",
+        "thủ đô Uzbekistan",
+        "Uzbekistan thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Uzbekistan là Tashkent."
+    },
+    {
+      "id": "capital-canada",
+      "patterns": [
+        "thủ đô của Canada là gì",
+        "thủ đô Canada",
+        "Canada thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Canada là Ottawa."
+    },
+    {
+      "id": "capital-mexico",
+      "patterns": [
+        "thủ đô của Mexico là gì",
+        "thủ đô Mexico",
+        "Mexico thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Mexico là Mexico City."
+    },
+    {
+      "id": "capital-brazil",
+      "patterns": [
+        "thủ đô của Brazil là gì",
+        "thủ đô Brazil",
+        "Brazil thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Brazil là Brasilia."
+    },
+    {
+      "id": "capital-argentina",
+      "patterns": [
+        "thủ đô của Argentina là gì",
+        "thủ đô Argentina",
+        "Argentina thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Argentina là Buenos Aires."
+    },
+    {
+      "id": "capital-chile",
+      "patterns": [
+        "thủ đô của Chile là gì",
+        "thủ đô Chile",
+        "Chile thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Chile là Santiago."
+    },
+    {
+      "id": "capital-peru",
+      "patterns": [
+        "thủ đô của Peru là gì",
+        "thủ đô Peru",
+        "Peru thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Peru là Lima."
+    },
+    {
+      "id": "capital-colombia",
+      "patterns": [
+        "thủ đô của Colombia là gì",
+        "thủ đô Colombia",
+        "Colombia thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Colombia là Bogotá."
+    },
+    {
+      "id": "capital-venezuela",
+      "patterns": [
+        "thủ đô của Venezuela là gì",
+        "thủ đô Venezuela",
+        "Venezuela thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Venezuela là Caracas."
+    },
+    {
+      "id": "capital-cuba",
+      "patterns": [
+        "thủ đô của Cuba là gì",
+        "thủ đô Cuba",
+        "Cuba thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Cuba là Havana."
+    },
+    {
+      "id": "capital-australia",
+      "patterns": [
+        "thủ đô của Úc là gì",
+        "thủ đô Úc",
+        "Úc thủ đô ở đâu",
+        "thủ đô australia"
+      ],
+      "answer": "Thủ đô của Úc là Canberra."
+    },
+    {
+      "id": "capital-newzealand",
+      "patterns": [
+        "thủ đô của New Zealand là gì",
+        "thủ đô New Zealand",
+        "New Zealand thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của New Zealand là Wellington."
+    },
+    {
+      "id": "capital-egypt",
+      "patterns": [
+        "thủ đô của Ai Cập là gì",
+        "thủ đô Ai Cập",
+        "Ai Cập thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Ai Cập là Cairo."
+    },
+    {
+      "id": "capital-southafrica",
+      "patterns": [
+        "thủ đô của Nam Phi là gì",
+        "thủ đô Nam Phi",
+        "Nam Phi thủ đô ở đâu",
+        "thủ đô nam phi"
+      ],
+      "answer": "Thủ đô của Nam Phi là Pretoria."
+    },
+    {
+      "id": "capital-nigeria",
+      "patterns": [
+        "thủ đô của Nigeria là gì",
+        "thủ đô Nigeria",
+        "Nigeria thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Nigeria là Abuja."
+    },
+    {
+      "id": "capital-kenya",
+      "patterns": [
+        "thủ đô của Kenya là gì",
+        "thủ đô Kenya",
+        "Kenya thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Kenya là Nairobi."
+    },
+    {
+      "id": "capital-ethiopia",
+      "patterns": [
+        "thủ đô của Ethiopia là gì",
+        "thủ đô Ethiopia",
+        "Ethiopia thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Ethiopia là Addis Ababa."
+    },
+    {
+      "id": "capital-morocco",
+      "patterns": [
+        "thủ đô của Ma Rốc là gì",
+        "thủ đô Ma Rốc",
+        "Ma Rốc thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Ma Rốc là Rabat."
+    },
+    {
+      "id": "capital-algeria",
+      "patterns": [
+        "thủ đô của Algeria là gì",
+        "thủ đô Algeria",
+        "Algeria thủ đô ở đâu"
+      ],
+      "answer": "Thủ đô của Algeria là Algiers."
+    },
+    {
+      "id": "vn-area",
+      "patterns": [
+        "diện tích việt nam",
+        "việt nam rộng bao nhiêu",
+        "diện tích nước việt nam"
+      ],
+      "answer": "Diện tích Việt Nam khoảng 331.212 km²."
+    },
+    {
+      "id": "vn-currency",
+      "patterns": [
+        "tiền tệ việt nam",
+        "việt nam dùng tiền gì",
+        "đơn vị tiền việt nam"
+      ],
+      "answer": "Tiền tệ Việt Nam là Đồng (VND, ký hiệu ₫)."
+    },
+    {
+      "id": "vn-flag",
+      "patterns": [
+        "quốc kỳ việt nam",
+        "cờ việt nam",
+        "lá cờ việt nam"
+      ],
+      "answer": "Quốc kỳ Việt Nam là cờ đỏ sao vàng: nền đỏ, ngôi sao vàng 5 cánh ở giữa."
+    },
+    {
+      "id": "vn-anthem",
+      "patterns": [
+        "quốc ca việt nam",
+        "quốc ca việt nam là bài gì"
+      ],
+      "answer": "Quốc ca Việt Nam là bài Tiến Quân Ca của nhạc sĩ Văn Cao."
+    },
+    {
+      "id": "vn-flower",
+      "patterns": [
+        "quốc hoa việt nam",
+        "hoa sen quốc hoa"
+      ],
+      "answer": "Quốc hoa Việt Nam là hoa sen."
+    },
+    {
+      "id": "vn-timezone",
+      "patterns": [
+        "múi giờ việt nam",
+        "việt nam múi giờ mấy",
+        "giờ việt nam utc"
+      ],
+      "answer": "Việt Nam dùng múi giờ UTC+7, không đổi giờ mùa hè."
+    },
+    {
+      "id": "vn-phone",
+      "patterns": [
+        "mã điện thoại việt nam",
+        "đầu số việt nam",
+        "mã vùng việt nam"
+      ],
+      "answer": "Mã điện thoại quốc tế của Việt Nam là +84."
+    },
+    {
+      "id": "vn-coast",
+      "patterns": [
+        "bờ biển việt nam dài bao nhiêu",
+        "đường bờ biển việt nam"
+      ],
+      "answer": "Đường bờ biển Việt Nam dài khoảng 3.260 km."
+    },
+    {
+      "id": "vn-provinces",
+      "patterns": [
+        "việt nam có bao nhiêu tỉnh",
+        "việt nam có bao nhiêu tỉnh thành"
+      ],
+      "answer": "Từ tháng 6/2025 Việt Nam còn 34 tỉnh, thành phố sau sáp nhập (trước đó là 63). Con số có thể cập nhật thêm, bạn hỏi .AI số tỉnh mới nhất để mình tìm Internet nhé.",
+      "volatile": true
+    },
+    {
+      "id": "vn-bigcity",
+      "patterns": [
+        "thành phố đông dân nhất việt nam",
+        "thành phố lớn nhất việt nam"
+      ],
+      "answer": "Thành phố đông dân và lớn nhất Việt Nam là TP. Hồ Chí Minh."
+    },
+    {
+      "id": "vn-fansipan",
+      "patterns": [
+        "đỉnh núi cao nhất việt nam",
+        "fansipan cao bao nhiêu",
+        "nóc nhà đông dương"
+      ],
+      "answer": "Đỉnh cao nhất Việt Nam (nóc nhà Đông Dương) là Fansipan, cao 3.143 m, ở Lào Cai."
+    },
+    {
+      "id": "vn-halong",
+      "patterns": [
+        "vịnh hạ long ở đâu",
+        "vịnh hạ long thuộc tỉnh nào"
+      ],
+      "answer": "Vịnh Hạ Long ở Quảng Ninh, là Di sản Thiên nhiên Thế giới được UNESCO công nhận."
+    },
+    {
+      "id": "vn-hoian",
+      "patterns": [
+        "phố cổ hội an ở đâu",
+        "hội an thuộc tỉnh nào"
+      ],
+      "answer": "Phố cổ Hội An ở Quảng Nam (nay thuộc TP. Đà Nẵng sau sáp nhập 2025), là Di sản Văn hóa Thế giới."
+    },
+    {
+      "id": "vn-hue",
+      "patterns": [
+        "cố đô huế",
+        "huế là cố đô của triều nào",
+        "kinh thành huế"
+      ],
+      "answer": "Huế là cố đô của triều Nguyễn (1802-1945), nổi tiếng với Kinh thành, lăng tẩm và nhã nhạc cung đình."
+    },
+    {
+      "id": "vn-phongnha",
+      "patterns": [
+        "động phong nha ở đâu",
+        "phong nha kẻ bàng ở đâu"
+      ],
+      "answer": "Vườn quốc gia Phong Nha - Kẻ Bàng ở Quảng Bình, nổi tiếng với động Sơn Đoòng — hang động lớn nhất thế giới."
+    },
+    {
+      "id": "vn-phuquoc",
+      "patterns": [
+        "đảo phú quốc ở đâu",
+        "phú quốc thuộc tỉnh nào"
+      ],
+      "answer": "Đảo Phú Quốc ở Kiên Giang (nay thuộc tỉnh An Giang sau sáp nhập 2025), là đảo lớn nhất Việt Nam."
+    },
+    {
+      "id": "vn-tet",
+      "patterns": [
+        "tết nguyên đán là gì",
+        "tết việt nam khi nào",
+        "tết âm lịch là gì"
+      ],
+      "answer": "Tết Nguyên Đán là Tết cổ truyền Việt Nam, vào mùng 1 tháng Giêng âm lịch (thường cuối tháng 1 - giữa tháng 2 dương lịch)."
+    },
+    {
+      "id": "vn-hungking",
+      "patterns": [
+        "giỗ tổ hùng vương ngày nào",
+        "10/3 âm lịch là ngày gì",
+        "giỗ tổ khi nào"
+      ],
+      "answer": "Giỗ Tổ Hùng Vương vào mùng 10 tháng 3 âm lịch hằng năm, là quốc lễ của Việt Nam."
+    },
+    {
+      "id": "vn-30-4",
+      "patterns": [
+        "30/4 là ngày gì",
+        "ngày giải phóng miền nam",
+        "30 tháng 4 là ngày gì"
+      ],
+      "answer": "Ngày 30/4/1975 là Ngày Giải phóng miền Nam, thống nhất đất nước."
+    },
+    {
+      "id": "vn-19-8",
+      "patterns": [
+        "19/8 là ngày gì",
+        "cách mạng tháng 8"
+      ],
+      "answer": "Ngày 19/8/1945 là ngày Cách mạng Tháng Tám thành công ở Hà Nội, mở đầu tổng khởi nghĩa cả nước."
+    },
+    {
+      "id": "vn-dbp",
+      "patterns": [
+        "chiến thắng điện biên phủ năm nào",
+        "7/5/1954 là ngày gì"
+      ],
+      "answer": "Chiến thắng Điện Biên Phủ vào ngày 7/5/1954, kết thúc chiến tranh Đông Dương lần thứ nhất."
+    },
+    {
+      "id": "vn-hochiminh-birth",
+      "patterns": [
+        "bác hồ sinh ngày nào",
+        "ngày sinh chủ tịch hồ chí minh",
+        "19/5 là ngày gì"
+      ],
+      "answer": "Chủ tịch Hồ Chí Minh sinh ngày 19/5/1890 ở Nghệ An."
+    },
+    {
+      "id": "vn-mid-autumn",
+      "patterns": [
+        "trung thu ngày nào",
+        "tết trung thu khi nào",
+        "15/8 âm lịch"
+      ],
+      "answer": "Tết Trung thu vào rằm tháng 8 âm lịch (15/8), là Tết thiếu nhi với đèn lồng, bánh nướng bánh dẻo."
+    },
+    {
+      "id": "vn-children-day",
+      "patterns": [
+        "1/6 là ngày gì",
+        "ngày quốc tế thiếu nhi"
+      ],
+      "answer": "Ngày 1/6 là Ngày Quốc tế Thiếu nhi."
+    },
+    {
+      "id": "vn-red-river",
+      "patterns": [
+        "sông hồng chảy qua đâu",
+        "sông hồng bắt nguồn từ đâu"
+      ],
+      "answer": "Sông Hồng bắt nguồn từ Trung Quốc, chảy qua Hà Nội rồi đổ ra Biển Đông, bồi đắp đồng bằng Bắc Bộ."
+    },
+    {
+      "id": "vn-mekong-delta",
+      "patterns": [
+        "đồng bằng sông cửu long",
+        "vựa lúa việt nam ở đâu"
+      ],
+      "answer": "Đồng bằng sông Cửu Long là vựa lúa lớn nhất Việt Nam, gồm 12 tỉnh miền Tây Nam Bộ."
+    },
+    {
+      "id": "vn-climate",
+      "patterns": [
+        "khí hậu việt nam",
+        "việt nam thuộc khí hậu gì"
+      ],
+      "answer": "Việt Nam có khí hậu nhiệt đới gió mùa: miền Bắc 4 mùa, miền Nam 2 mùa mưa - khô."
+    },
+    {
+      "id": "vn-aodai",
+      "patterns": [
+        "áo dài là gì",
+        "trang phục truyền thống việt nam"
+      ],
+      "answer": "Áo dài là trang phục truyền thống Việt Nam, thường đi kèm khăn đóng, nón lá trong lễ hội."
+    },
+    {
+      "id": "vn-language",
+      "patterns": [
+        "việt nam nói tiếng gì",
+        "tiếng việt có bao nhiêu chữ cái"
+      ],
+      "answer": "Việt Nam dùng tiếng Việt với chữ Quốc ngữ (29 chữ cái, dùng bảng chữ Latin có dấu)."
+    },
+    {
+      "id": "vn-coffee-export",
+      "patterns": [
+        "việt nam xuất khẩu cà phê",
+        "cà phê việt nam nổi tiếng"
+      ],
+      "answer": "Việt Nam là nước xuất khẩu cà phê (robusta) lớn hàng đầu thế giới, nổi tiếng với cà phê sữa đá, cà phê trứng."
+    },
+    {
+      "id": "vn-rice",
+      "patterns": [
+        "việt nam xuất khẩu gạo",
+        "gạo việt nam"
+      ],
+      "answer": "Việt Nam thuộc top xuất khẩu gạo lớn nhất thế giới, gạo ST25 từng đoạt giải gạo ngon nhất thế giới."
+    },
+    {
+      "id": "sky-blue",
+      "patterns": [
+        "tại sao bầu trời màu xanh",
+        "bầu trời màu xanh vì sao",
+        "vì sao trời xanh",
+        "trời xanh vì sao"
+      ],
+      "answer": "Bầu trời màu xanh do hiện tượng tán xạ Rayleigh: ánh sáng Mặt Trời bị phân tử không khí tán xạ, ánh sáng xanh tán xạ mạnh nhất nên mắt ta thấy trời xanh."
+    },
+    {
+      "id": "rainbow",
+      "patterns": [
+        "cầu vồng hình thành thế nào",
+        "vì sao có cầu vồng",
+        "cầu vồng có mấy màu"
+      ],
+      "answer": "Cầu vồng hình thành khi ánh sáng Mặt Trời khúc xạ và phản xạ qua giọt nước mưa, tách thành 7 màu: đỏ, cam, vàng, lục, lam, chàm, tím."
+    },
+    {
+      "id": "thunder",
+      "patterns": [
+        "sấm sét hình thành thế nào",
+        "vì sao có sấm sét",
+        "tia chớp là gì"
+      ],
+      "answer": "Sấm sét do phóng điện giữa các đám mây hoặc giữa mây với đất; tia chớp là ánh sáng, tiếng sấm là âm thanh đến sau vì âm thanh chậm hơn ánh sáng."
+    },
+    {
+      "id": "rain",
+      "patterns": [
+        "mưa hình thành thế nào",
+        "vì sao có mưa"
+      ],
+      "answer": "Mưa hình thành khi hơi nước bốc lên cao, ngưng tụ thành mây, giọt nước đủ nặng thì rơi xuống thành mưa."
+    },
+    {
+      "id": "day-night",
+      "patterns": [
+        "vì sao có ngày và đêm",
+        "tại sao có ngày đêm"
+      ],
+      "answer": "Ngày và đêm do Trái Đất tự quay quanh trục: mặt hướng về Mặt Trời là ban ngày, mặt khuất là ban đêm. Một vòng quay hết 24 giờ."
+    },
+    {
+      "id": "seasons",
+      "patterns": [
+        "vì sao có 4 mùa",
+        "tại sao có mùa đông mùa hè"
+      ],
+      "answer": "Bốn mùa do trục Trái Đất nghiêng khi quay quanh Mặt Trời, khiến mỗi bán cầu nhận lượng nắng khác nhau theo thời gian trong năm."
+    },
+    {
+      "id": "leap-year",
+      "patterns": [
+        "năm nhuận là gì",
+        "vì sao có năm nhuận",
+        "năm nhuận bao nhiêu ngày"
+      ],
+      "answer": "Năm nhuận có 366 ngày (tháng 2 có 29 ngày), xảy ra gần như mỗi 4 năm để bù phần lẻ ~6 giờ mỗi năm của chu kỳ quay quanh Mặt Trời."
+    },
+    {
+      "id": "tide",
+      "patterns": [
+        "thủy triều do đâu",
+        "vì sao có thủy triều",
+        "thủy triều lên xuống vì sao"
+      ],
+      "answer": "Thủy triều chủ yếu do lực hấp dẫn của Mặt Trăng (và một phần Mặt Trời) kéo nước biển lên xuống theo chu kỳ mỗi ngày."
+    },
+    {
+      "id": "eclipse-solar",
+      "patterns": [
+        "nhật thực là gì",
+        "vì sao có nhật thực"
+      ],
+      "answer": "Nhật thực xảy ra khi Mặt Trăng che khuất Mặt Trời nhìn từ Trái Đất. Đừng nhìn trực tiếp bằng mắt thường."
+    },
+    {
+      "id": "eclipse-lunar",
+      "patterns": [
+        "nguyệt thực là gì",
+        "vì sao có nguyệt thực",
+        "trăng máu là gì"
+      ],
+      "answer": "Nguyệt thực xảy ra khi Trái Đất che Mặt Trời khiến bóng đổ lên Mặt Trăng; trăng có thể đỏ rực gọi là trăng máu."
+    },
+    {
+      "id": "sun-star",
+      "patterns": [
+        "mặt trời là gì",
+        "mặt trời có phải ngôi sao"
+      ],
+      "answer": "Mặt Trời chính là một ngôi sao ở trung tâm Hệ Mặt Trời, cách Trái Đất khoảng 150 triệu km."
+    },
+    {
+      "id": "moon",
+      "patterns": [
+        "mặt trăng cách trái đất bao xa",
+        "mặt trăng là gì"
+      ],
+      "answer": "Mặt Trăng là vệ tinh tự nhiên duy nhất của Trái Đất, cách khoảng 384.400 km, gây ra thủy triều."
+    },
+    {
+      "id": "mars",
+      "patterns": [
+        "sao hỏa màu gì",
+        "sao hỏa có sự sống không"
+      ],
+      "answer": "Sao Hỏa có màu đỏ do bụi sắt oxit, là hành tinh được nghiên cứu nhiều nhất cho khả năng từng có nước và sự sống."
+    },
+    {
+      "id": "venus",
+      "patterns": [
+        "hành tinh nóng nhất",
+        "sao kim nóng bao nhiêu"
+      ],
+      "answer": "Sao Kim là hành tinh nóng nhất (~465°C) do hiệu ứng nhà kính cực mạnh, dù không gần Mặt Trời nhất."
+    },
+    {
+      "id": "jupiter",
+      "patterns": [
+        "hành tinh lớn nhất",
+        "sao mộc lớn cỡ nào"
+      ],
+      "answer": "Sao Mộc là hành tinh lớn nhất Hệ Mặt Trời, chứa được hơn 1.300 Trái Đất bên trong."
+    },
+    {
+      "id": "saturn-ring",
+      "patterns": [
+        "sao thổ có vành đai gì",
+        "vành đai sao thổ là gì"
+      ],
+      "answer": "Sao Thổ nổi tiếng với vành đai khổng lồ làm từ băng và đá vụn."
+    },
+    {
+      "id": "milky-way",
+      "patterns": [
+        "dải ngân hà là gì",
+        "thiên hà của chúng ta tên gì"
+      ],
+      "answer": "Dải Ngân Hà (Milky Way) là thiên hà chứa Hệ Mặt Trời, gồm hàng trăm tỷ ngôi sao."
+    },
+    {
+      "id": "bigbang",
+      "patterns": [
+        "big bang là gì",
+        "vũ trụ hình thành thế nào"
+      ],
+      "answer": "Thuyết Big Bang cho rằng vũ trụ bắt đầu từ một vụ nổ lớn cách đây khoảng 13,8 tỷ năm và vẫn đang giãn nở."
+    },
+    {
+      "id": "blackhole",
+      "patterns": [
+        "hố đen là gì",
+        "lỗ đen vũ trụ"
+      ],
+      "answer": "Hố đen là vùng không gian có lực hấp dẫn cực mạnh, đến ánh sáng cũng không thoát ra được."
+    },
+    {
+      "id": "light-year",
+      "patterns": [
+        "năm ánh sáng là gì",
+        "1 năm ánh sáng bằng bao nhiêu km"
+      ],
+      "answer": "Năm ánh sáng là quãng đường ánh sáng đi trong 1 năm, khoảng 9.460 tỷ km."
+    },
+    {
+      "id": "water-h2o",
+      "patterns": [
+        "nước có công thức gì",
+        "h2o là gì"
+      ],
+      "answer": "Nước có công thức H2O: 2 nguyên tử hydro + 1 nguyên tử oxy."
+    },
+    {
+      "id": "oxygen",
+      "patterns": [
+        "oxy có ký hiệu gì",
+        "khí oxy là gì"
+      ],
+      "answer": "Khí oxy (O2) chiếm khoảng 21% không khí, cần thiết cho hô hấp và sự cháy."
+    },
+    {
+      "id": "co2",
+      "patterns": [
+        "co2 là gì",
+        "khí cacbonic là gì"
+      ],
+      "answer": "CO2 (cacbonic) là khí do con người thở ra, cây dùng để quang hợp; dư thừa gây hiệu ứng nhà kính."
+    },
+    {
+      "id": "photosynthesis",
+      "patterns": [
+        "quang hợp là gì",
+        "cây quang hợp thế nào"
+      ],
+      "answer": "Quang hợp là quá trình cây dùng ánh sáng + nước + CO2 để tạo đường và thải oxy."
+    },
+    {
+      "id": "gravity",
+      "patterns": [
+        "trọng lực là gì",
+        "lực hấp dẫn là gì",
+        "ai phát hiện trọng lực"
+      ],
+      "answer": "Trọng lực là lực hút giữa các vật có khối lượng, do Newton mô tả; trên Trái Đất gia tốc rơi tự do ≈ 9,8 m/s²."
+    },
+    {
+      "id": "newton",
+      "patterns": [
+        "newton là ai",
+        "định luật newton"
+      ],
+      "answer": "Isaac Newton là nhà vật lý với 3 định luật chuyển động và định luật vạn vật hấp dẫn."
+    },
+    {
+      "id": "einstein",
+      "patterns": [
+        "einstein là ai",
+        "e=mc2 là gì",
+        "thuyết tương đối là gì"
+      ],
+      "answer": "Albert Einstein là cha đẻ thuyết tương đối với công thức nổi tiếng E=mc² (năng lượng = khối lượng × tốc độ ánh sáng bình phương)."
+    },
+    {
+      "id": "electricity",
+      "patterns": [
+        "điện là gì",
+        "dòng điện là gì"
+      ],
+      "answer": "Dòng điện là dòng chuyển động có hướng của các electron trong dây dẫn."
+    },
+    {
+      "id": "magnet",
+      "patterns": [
+        "nam châm hút gì",
+        "nam châm là gì"
+      ],
+      "answer": "Nam châm hút sắt, niken, coban; có 2 cực Bắc - Nam, cực cùng tên đẩy nhau."
+    },
+    {
+      "id": "sound",
+      "patterns": [
+        "âm thanh truyền thế nào",
+        "tốc độ âm thanh"
+      ],
+      "answer": "Âm thanh truyền qua rung động của môi trường (khí, lỏng, rắn), tốc độ trong không khí ≈ 343 m/s, không truyền được trong chân không."
+    },
+    {
+      "id": "diamond",
+      "patterns": [
+        "kim cương là gì",
+        "vật cứng nhất là gì"
+      ],
+      "answer": "Kim cương là dạng tinh thể của cacbon, là vật liệu tự nhiên cứng nhất."
+    },
+    {
+      "id": "gold-au",
+      "patterns": [
+        "ký hiệu vàng",
+        "vàng có ký hiệu hóa học gì"
+      ],
+      "answer": "Vàng có ký hiệu Au, là kim loại quý không gỉ, dẫn điện tốt."
+    },
+    {
+      "id": "iron",
+      "patterns": [
+        "sắt có ký hiệu gì",
+        "vì sao sắt bị rỉ"
+      ],
+      "answer": "Sắt (Fe) bị rỉ khi tiếp xúc với oxy và nước tạo oxit sắt; sơn hoặc mạ kẽm giúp chống rỉ."
+    },
+    {
+      "id": "mercury",
+      "patterns": [
+        "thủy ngân là gì",
+        "kim loại lỏng ở nhiệt độ thường"
+      ],
+      "answer": "Thủy ngân là kim loại duy nhất ở thể lỏng trong nhiệt độ thường, rất độc."
+    },
+    {
+      "id": "blood",
+      "patterns": [
+        "máu màu gì",
+        "vì sao máu đỏ"
+      ],
+      "answer": "Máu đỏ nhờ hemoglobin chứa sắt trong hồng cầu, làm nhiệm vụ vận chuyển oxy."
+    },
+    {
+      "id": "heart",
+      "patterns": [
+        "tim đập bao nhiêu lần",
+        "tim có nhiệm vụ gì"
+      ],
+      "answer": "Tim bơm máu đi khắp cơ thể, đập khoảng 60-100 lần/phút lúc nghỉ ở người trưởng thành."
+    },
+    {
+      "id": "brain",
+      "patterns": [
+        "não có nhiệm vụ gì",
+        "não người nặng bao nhiêu"
+      ],
+      "answer": "Não điều khiển mọi hoạt động cơ thể, nặng khoảng 1,3-1,4 kg, tiêu thụ ~20% năng lượng cơ thể."
+    },
+    {
+      "id": "bones",
+      "patterns": [
+        "người có bao nhiêu xương",
+        "xương dài nhất cơ thể"
+      ],
+      "answer": "Người trưởng thành có 206 xương; xương dài nhất là xương đùi."
+    },
+    {
+      "id": "teeth",
+      "patterns": [
+        "người có bao nhiêu răng",
+        "răng sữa bao nhiêu cái"
+      ],
+      "answer": "Người trưởng thành có 32 răng (kể cả răng khôn); trẻ em có 20 răng sữa."
+    },
+    {
+      "id": "dna",
+      "patterns": [
+        "adn là gì",
+        "dna là gì"
+      ],
+      "answer": "ADN (DNA) là phân tử mang thông tin di truyền, quyết định đặc điểm của mỗi sinh vật."
+    },
+    {
+      "id": "cell",
+      "patterns": [
+        "tế bào là gì",
+        "đơn vị cơ bản của sự sống"
+      ],
+      "answer": "Tế bào là đơn vị cấu tạo cơ bản của sự sống; cơ thể người có khoảng 30 nghìn tỷ tế bào."
+    },
+    {
+      "id": "virus-bacteria",
+      "patterns": [
+        "virus và vi khuẩn khác nhau thế nào",
+        "vi khuẩn virus khác gì"
+      ],
+      "answer": "Vi khuẩn là sinh vật đơn bào (kháng sinh trị được); virus nhỏ hơn nhiều, sống ký sinh trong tế bào (kháng sinh không trị được)."
+    },
+    {
+      "id": "vaccine",
+      "patterns": [
+        "vắc xin là gì",
+        "vaccine có tác dụng gì"
+      ],
+      "answer": "Vắc xin giúp cơ thể tạo miễn dịch trước bệnh bằng cách tiếp xúc an toàn với mầm bệnh đã làm yếu."
+    },
+    {
+      "id": "volcano",
+      "patterns": [
+        "núi lửa phun trào vì sao",
+        "núi lửa là gì"
+      ],
+      "answer": "Núi lửa phun trào khi magma từ lòng đất thoát lên qua vết nứt vỏ Trái Đất."
+    },
+    {
+      "id": "earthquake",
+      "patterns": [
+        "động đất do đâu",
+        "vì sao có động đất"
+      ],
+      "answer": "Động đất do mảng kiến tạo va chạm, trượt hoặc nứt gãy, giải phóng năng lượng khổng lồ."
+    },
+    {
+      "id": "tsunami",
+      "patterns": [
+        "sóng thần là gì",
+        "sóng thần do đâu"
+      ],
+      "answer": "Sóng thần thường do động đất mạnh dưới đáy biển gây ra, tạo sóng cao tàn phá bờ biển."
+    },
+    {
+      "id": "storm",
+      "patterns": [
+        "bão hình thành thế nào",
+        "áp thấp nhiệt đới là gì"
+      ],
+      "answer": "Bão hình thành trên biển ấm khi không khí ẩm bốc lên xoáy mạnh; ở Việt Nam mùa bão thường từ tháng 6-11."
+    },
+    {
+      "id": "evaporation",
+      "patterns": [
+        "bay hơi là gì",
+        "ngưng tụ là gì",
+        "vòng tuần hoàn nước"
+      ],
+      "answer": "Nước bay hơi khi nóng lên, ngưng tụ thành mây khi gặp lạnh — tạo vòng tuần hoàn nước trong tự nhiên."
+    },
+    {
+      "id": "fossil",
+      "patterns": [
+        "hóa thạch là gì",
+        "hóa thạch hình thành thế nào"
+      ],
+      "answer": "Hóa thạch là di tích sinh vật cổ được bảo tồn trong đá qua hàng triệu năm."
+    },
+    {
+      "id": "evolution",
+      "patterns": [
+        "tiến hóa là gì",
+        "thuyết tiến hóa của ai"
+      ],
+      "answer": "Thuyết tiến hóa của Darwin cho rằng sinh vật thay đổi dần qua chọn lọc tự nhiên để thích nghi."
+    },
+    {
+      "id": "plant-need",
+      "patterns": [
+        "cây cần gì để sống",
+        "cây xanh cần gì"
+      ],
+      "answer": "Cây cần ánh sáng, nước, CO2 và chất dinh dưỡng từ đất để quang hợp và sinh trưởng."
+    },
+    {
+      "id": "fever",
+      "patterns": [
+        "sốt bao nhiêu độ",
+        "bao nhiêu độ là sốt",
+        "sốt phải làm sao"
+      ],
+      "answer": "Từ 38°C trở lên được coi là sốt. Uống nhiều nước, nghỉ ngơi; sốt cao trên 39,5°C hoặc kéo dài thì đi khám."
+    },
+    {
+      "id": "blood-pressure",
+      "patterns": [
+        "huyết áp bình thường",
+        "huyết áp bao nhiêu là bình thường"
+      ],
+      "answer": "Huyết áp bình thường khoảng dưới 120/80 mmHg."
+    },
+    {
+      "id": "water-day",
+      "patterns": [
+        "mỗi ngày uống bao nhiêu nước",
+        "uống bao nhiêu nước mỗi ngày"
+      ],
+      "answer": "Người trưởng thành nên uống khoảng 2 lít nước mỗi ngày (hơn khi vận động, trời nóng)."
+    },
+    {
+      "id": "sleep-hours",
+      "patterns": [
+        "nên ngủ mấy tiếng",
+        "ngủ bao nhiêu tiếng là đủ"
+      ],
+      "answer": "Người trưởng thành cần ngủ 7-9 tiếng mỗi đêm; thiếu ngủ lâu ngày hại tim, não và miễn dịch."
+    },
+    {
+      "id": "sleepy-afternoon",
+      "patterns": [
+        "vì sao buổi chiều buồn ngủ",
+        "làm sao hết buồn ngủ buổi chiều"
+      ],
+      "answer": "Buồn ngủ buổi chiều do nhịp sinh học trưa - chiều xuống thấp + ăn no. Rửa mặt nước lạnh, đi lại, uống nước hoặc chợp mắt 15-20 phút sẽ tỉnh."
+    },
+    {
+      "id": "myopia",
+      "patterns": [
+        "cận thị là gì",
+        "vì sao bị cận"
+      ],
+      "answer": "Cận thị là nhìn gần rõ, nhìn xa mờ; thường do đọc/học thiếu sáng, dán mắt vào màn hình quá lâu. Đeo kính đúng độ và cho mắt nghỉ giúp hạn chế tăng độ."
+    },
+    {
+      "id": "brush-teeth",
+      "patterns": [
+        "mỗi ngày đánh răng mấy lần",
+        "đánh răng bao lâu"
+      ],
+      "answer": "Nên đánh răng 2 lần/ngày (sáng - tối), mỗi lần khoảng 2 phút."
+    },
+    {
+      "id": "carsick",
+      "patterns": [
+        "say xe phải làm sao",
+        "chống say xe thế nào"
+      ],
+      "answer": "Chống say xe: ngồi ghế trước, nhìn xa, thoáng gió, ăn nhẹ trước chuyến đi, có thể dùng thuốc chống say theo hướng dẫn."
+    },
+    {
+      "id": "mosquito",
+      "patterns": [
+        "muỗi gây bệnh gì",
+        "sốt xuất huyết do muỗi nào"
+      ],
+      "answer": "Muỗi vằn truyền sốt xuất huyết và zika; muỗi anophen truyền sốt rét. Ngủ màn, diệt lăng quăng, dọn nước đọng để phòng."
+    },
+    {
+      "id": "bee-sting",
+      "patterns": [
+        "ong đốt phải làm sao",
+        "bị ong đốt làm gì"
+      ],
+      "answer": "Ong đốt: lấy ngòi ra, chườm lạnh, theo dõi; nếu khó thở, sưng môi - mặt, chóng mặt thì đi cấp cứu ngay (sốc phản vệ)."
+    },
+    {
+      "id": "burn",
+      "patterns": [
+        "bị bỏng phải làm sao",
+        "sơ cứu bỏng"
+      ],
+      "answer": "Bỏng nhẹ: xả nước mát 15-20 phút, không bôi kem đánh răng/mỡ, che gạc sạch; bỏng nặng, rộp lớn thì đi viện."
+    },
+    {
+      "id": "nosebleed",
+      "patterns": [
+        "chảy máu cam phải làm sao",
+        "chảy máu mũi làm gì"
+      ],
+      "answer": "Chảy máu cam: ngồi thẳng, hơi cúi đầu, bóp cánh mũi 10-15 phút, chườm lạnh sống mũi; không ngửa đầu ra sau."
+    },
+    {
+      "id": "hiccup",
+      "patterns": [
+        "nấc cụt làm sao hết",
+        "vì sao bị nấc"
+      ],
+      "answer": "Nấc do cơ hoành co thắt. Thường tự hết; nín thở, uống nước lạnh từng ngụm nhỏ giúp cắt cơn nấc."
+    },
+    {
+      "id": "sneeze",
+      "patterns": [
+        "vì sao hắt hơi",
+        "hắt hơi là gì"
+      ],
+      "answer": "Hắt hơi là phản xạ đẩy dị vật, bụi, virus ra khỏi mũi để bảo vệ đường thở."
+    },
+    {
+      "id": "yawn",
+      "patterns": [
+        "vì sao ngáp",
+        "ngáp có lây không"
+      ],
+      "answer": "Ngáp giúp đưa thêm oxy lên não khi mệt, buồn ngủ; ngáp có tính lây qua hiệu ứng tâm lý."
+    },
+    {
+      "id": "stress",
+      "patterns": [
+        "stress phải làm sao",
+        "giảm stress thế nào"
+      ],
+      "answer": "Giảm stress: ngủ đủ, vận động, hít thở sâu, chia nhỏ việc, tâm sự với người tin cậy; kéo dài thì nên gặp chuyên gia."
+    },
+    {
+      "id": "insomnia",
+      "patterns": [
+        "mất ngủ phải làm sao",
+        "khó ngủ làm thế nào"
+      ],
+      "answer": "Chữa mất ngủ: giờ ngủ cố định, tránh cà phê sau 14h, hạn chế điện thoại trước ngủ 1 tiếng, phòng tối - mát - yên tĩnh."
+    },
+    {
+      "id": "headache",
+      "patterns": [
+        "đau đầu phải làm sao",
+        "đau đầu uống gì"
+      ],
+      "answer": "Đau đầu nhẹ: nghỉ ngơi, uống nước, tránh màn hình; đau dữ dội, kéo dài hoặc kèm nôn, mờ mắt thì đi khám."
+    },
+    {
+      "id": "flu",
+      "patterns": [
+        "cảm cúm phải làm sao",
+        "cảm lạnh cảm cúm khác nhau"
+      ],
+      "answer": "Cảm cúm: nghỉ ngơi, uống nhiều nước ấm, ăn đủ chất; sốt cao, khó thở thì đi khám. Rửa tay, đeo khẩu trang để phòng lây."
+    },
+    {
+      "id": "acne",
+      "patterns": [
+        "vì sao bị mụn",
+        "trị mụn thế nào"
+      ],
+      "answer": "Mụn do bít tắc lỗ chân lông + vi khuẩn + nội tiết. Rửa mặt 2 lần/ngày, không nặn mụn viêm, ngủ đủ; mụn nặng nên khám da liễu."
+    },
+    {
+      "id": "hair-loss",
+      "patterns": [
+        "vì sao rụng tóc",
+        "rụng tóc nhiều phải làm sao"
+      ],
+      "answer": "Rụng dưới ~100 sợi/ngày là bình thường. Rụng nhiều, hói mảng có thể do stress, thiếu chất, nội tiết — nên đi khám."
+    },
+    {
+      "id": "height",
+      "patterns": [
+        "làm sao cao lên",
+        "tuổi nào hết cao"
+      ],
+      "answer": "Chiều cao phụ thuộc gen, dinh dưỡng, ngủ đủ và vận động (bơi, bóng rổ, xà đơn) trước 18-20 tuổi; sau dậy thì cao thêm rất ít."
+    },
+    {
+      "id": "lose-weight",
+      "patterns": [
+        "giảm cân thế nào",
+        "làm sao giảm cân an toàn"
+      ],
+      "answer": "Giảm cân an toàn: ăn thâm hụt calo nhẹ, nhiều rau - đạm, hạn chế đường - đồ chiên, vận động đều; không nhịn ăn cực đoan."
+    },
+    {
+      "id": "exercise",
+      "patterns": [
+        "mỗi tuần tập thể dục mấy lần",
+        "tập thể dục bao lâu"
+      ],
+      "answer": "Nên vận động ít nhất 150 phút/tuần (đi bộ nhanh, chạy, bơi...), kèm 2 buổi tập cơ."
+    },
+    {
+      "id": "vitamin-c",
+      "patterns": [
+        "vitamin c có tác dụng gì",
+        "ăn gì bổ sung vitamin c"
+      ],
+      "answer": "Vitamin C tăng miễn dịch, đẹp da; có nhiều trong cam, ổi, kiwi, ớt chuông."
+    },
+    {
+      "id": "calcium",
+      "patterns": [
+        "canxi có tác dụng gì",
+        "ăn gì bổ sung canxi"
+      ],
+      "answer": "Canxi giúp xương - răng chắc khỏe; có trong sữa, tôm tép ăn cả vỏ, rau xanh đậm, đậu."
+    },
+    {
+      "id": "anemia",
+      "patterns": [
+        "thiếu máu ăn gì",
+        "thiếu máu có dấu hiệu gì"
+      ],
+      "answer": "Thiếu máu gây mệt, chóng mặt, da xanh. Ăn thịt đỏ, gan, rau xanh đậm, uống vitamin C kèm để hấp thu sắt tốt hơn."
+    },
+    {
+      "id": "menstrual",
+      "patterns": [
+        "đau bụng kinh phải làm sao",
+        "đau bụng kinh làm gì"
+      ],
+      "answer": "Đau bụng kinh: chườm ấm bụng, nghỉ ngơi, uống nước ấm; đau dữ dội, nôn hoặc rối loạn thì đi khám phụ khoa."
+    },
+    {
+      "id": "sunscreen",
+      "patterns": [
+        "vì sao phải bôi kem chống nắng",
+        "kem chống nắng có tác dụng gì"
+      ],
+      "answer": "Kem chống nắng bảo vệ da khỏi tia UV gây sạm, lão hóa và ung thư da; bôi lại mỗi 2-3 tiếng khi ra nắng."
+    },
+    {
+      "id": "hand-wash",
+      "patterns": [
+        "vì sao phải rửa tay",
+        "rửa tay bao lâu"
+      ],
+      "answer": "Rửa tay bằng xà phòng ít nhất 20 giây loại bỏ virus, vi khuẩn — cách phòng bệnh rẻ mà hiệu quả nhất."
+    },
+    {
+      "id": "first-aid-kit",
+      "patterns": [
+        "tủ thuốc gia đình cần gì",
+        "nên có thuốc gì trong nhà"
+      ],
+      "answer": "Tủ thuốc nên có: hạ sốt, oresol, băng gạc, cồn - povidine, thuốc dị ứng, thuốc đau bụng, nhiệt kế."
+    },
+    {
+      "id": "drowning-aid",
+      "patterns": [
+        "sơ cứu đuối nước",
+        "đuối nước phải làm sao"
+      ],
+      "answer": "Đuối nước: gọi cấp cứu 115, đưa lên bờ an toàn, hà hơi - ép tim nếu ngừng thở; tuyệt đối không dốc ngược nạn nhân."
+    },
+    {
+      "id": "snake-bite",
+      "patterns": [
+        "rắn cắn phải làm sao",
+        "sơ cứu rắn cắn"
+      ],
+      "answer": "Rắn cắn: giữ bình tĩnh, bất động chi bị cắn, tháo nhẫn - vòng, đến viện ngay; không garo, không rạch hút nọc."
+    },
+    {
+      "id": "food-poison",
+      "patterns": [
+        "ngộ độc thực phẩm phải làm sao",
+        "ăn phải đồ ôi thiu"
+      ],
+      "answer": "Ngộ độc thực phẩm: bù nước - oresol, ăn nhẹ; nôn - tiêu chảy nặng, sốt cao, co giật thì đi viện ngay."
+    },
+    {
+      "id": "wifi",
+      "patterns": [
+        "wifi là gì",
+        "wi-fi là gì"
+      ],
+      "answer": "WiFi là công nghệ mạng không dây dùng sóng vô tuyến để kết nối Internet trong phạm vi ngắn."
+    },
+    {
+      "id": "4g-5g",
+      "patterns": [
+        "4g 5g khác nhau thế nào",
+        "5g nhanh hơn 4g bao nhiêu"
+      ],
+      "answer": "5G nhanh hơn 4G hàng chục lần, độ trễ thấp hơn nhiều, phục vụ xe tự lái, IoT, streaming 4K."
+    },
+    {
+      "id": "bluetooth",
+      "patterns": [
+        "bluetooth là gì",
+        "kết nối bluetooth"
+      ],
+      "answer": "Bluetooth là kết nối không dây tầm ngắn giữa điện thoại, tai nghe, loa, đồng hồ..."
+    },
+    {
+      "id": "gps",
+      "patterns": [
+        "gps là gì",
+        "định vị gps"
+      ],
+      "answer": "GPS là hệ thống định vị vệ tinh của Mỹ, giúp xác định vị trí chính xác trên bản đồ."
+    },
+    {
+      "id": "charge-overnight",
+      "patterns": [
+        "sạc pin qua đêm có sao không",
+        "sạc điện thoại qua đêm"
+      ],
+      "answer": "Điện thoại đời mới tự ngắt khi đầy nên sạc qua đêm ít hại pin; điều hại pin nhất là vừa sạc vừa chơi game nặng và để máy quá nóng."
+    },
+    {
+      "id": "vn-electric",
+      "patterns": [
+        "điện việt nam bao nhiêu vôn",
+        "điện dân dụng việt nam"
+      ],
+      "answer": "Điện dân dụng Việt Nam là 220V - 50Hz, dùng phích 2 chân tròn hoặc dẹt."
+    },
+    {
+      "id": "iphone-apple",
+      "patterns": [
+        "iphone của hãng nào",
+        "apple là công ty nào"
+      ],
+      "answer": "iPhone là điện thoại của Apple (Mỹ), chạy hệ điều hành iOS."
+    },
+    {
+      "id": "android-google",
+      "patterns": [
+        "android của ai",
+        "hệ điều hành android của công ty nào"
+      ],
+      "answer": "Android là hệ điều hành di động của Google, dùng trên Samsung, Xiaomi, Oppo..."
+    },
+    {
+      "id": "zalo-vng",
+      "patterns": [
+        "zalo của ai",
+        "zalo công ty nào"
+      ],
+      "answer": "Zalo là ứng dụng nhắn tin của VNG, công ty công nghệ Việt Nam."
+    },
+    {
+      "id": "facebook-meta",
+      "patterns": [
+        "facebook của ai",
+        "mark zuckerberg là ai",
+        "meta là công ty nào"
+      ],
+      "answer": "Facebook do Mark Zuckerberg sáng lập, nay thuộc tập đoàn Meta (cùng Instagram, WhatsApp)."
+    },
+    {
+      "id": "google-founder",
+      "patterns": [
+        "google của ai",
+        "ai sáng lập google"
+      ],
+      "answer": "Google do Larry Page và Sergey Brin sáng lập năm 1998."
+    },
+    {
+      "id": "youtube",
+      "patterns": [
+        "youtube của ai",
+        "youtube ra đời năm nào"
+      ],
+      "answer": "YouTube thuộc Google, là nền tảng xem - chia sẻ video lớn nhất thế giới."
+    },
+    {
+      "id": "tiktok",
+      "patterns": [
+        "tiktok của nước nào",
+        "tiktok của ai"
+      ],
+      "answer": "TikTok thuộc ByteDance (Trung Quốc), nổi tiếng với video ngắn."
+    },
+    {
+      "id": "internet",
+      "patterns": [
+        "internet là gì",
+        "mạng internet là gì"
+      ],
+      "answer": "Internet là mạng máy tính toàn cầu kết nối hàng tỷ thiết bị để trao đổi thông tin."
+    },
+    {
+      "id": "ai-basic",
+      "patterns": [
+        "ai là gì",
+        "trí tuệ nhân tạo là gì"
+      ],
+      "answer": "AI (trí tuệ nhân tạo) là công nghệ giúp máy tính học và xử lý việc như con người: nhận diện, dự đoán, trò chuyện..."
+    },
+    {
+      "id": "chatgpt",
+      "patterns": [
+        "chatgpt là gì",
+        "chatgpt của ai"
+      ],
+      "answer": "ChatGPT là chatbot AI của OpenAI (Mỹ), nổi tiếng từ cuối 2022."
+    },
+    {
+      "id": "gemini-google",
+      "patterns": [
+        "gemini là gì",
+        "gemini của google"
+      ],
+      "answer": "Gemini là mô hình AI của Google, tích hợp trong tìm kiếm, Android và nhiều sản phẩm Google."
+    },
+    {
+      "id": "qr",
+      "patterns": [
+        "mã qr là gì",
+        "qr code là gì"
+      ],
+      "answer": "Mã QR là mã vuông chứa thông tin (link, thanh toán...), quét bằng camera điện thoại là đọc được."
+    },
+    {
+      "id": "password-strong",
+      "patterns": [
+        "mật khẩu mạnh là gì",
+        "đặt mật khẩu thế nào an toàn"
+      ],
+      "answer": "Mật khẩu mạnh dài 12+ ký tự, gồm hoa - thường - số - ký tự đặc biệt, không dùng ngày sinh; mỗi nơi một mật khẩu khác nhau."
+    },
+    {
+      "id": "virus-pc",
+      "patterns": [
+        "virus máy tính là gì",
+        "máy tính bị virus"
+      ],
+      "answer": "Virus máy tính là phần mềm độc hại lây qua file, USB, link lạ; cài diệt virus, không mở file lạ để phòng."
+    },
+    {
+      "id": "ram-rom",
+      "patterns": [
+        "ram là gì",
+        "rom là gì",
+        "ram rom khác nhau"
+      ],
+      "answer": "RAM là bộ nhớ tạm giúp máy chạy mượt (càng nhiều càng đa nhiệm tốt); ROM/bộ nhớ trong là nơi lưu dữ liệu lâu dài."
+    },
+    {
+      "id": "sim",
+      "patterns": [
+        "esim là gì",
+        "sim là gì"
+      ],
+      "answer": "SIM là thẻ giúp điện thoại nhận sóng nhà mạng; eSIM là SIM điện tử tích hợp sẵn, không cần thẻ vật lý."
+    },
+    {
+      "id": "shopee",
+      "patterns": [
+        "shopee của nước nào",
+        "shopee là gì"
+      ],
+      "answer": "Shopee là sàn thương mại điện tử của Sea Group (Singapore), phổ biến nhất ở Việt Nam."
+    },
+    {
+      "id": "chatbot",
+      "patterns": [
+        "chatbot là gì",
+        "bot chat là gì"
+      ],
+      "answer": "Chatbot là chương trình tự động trò chuyện, trả lời theo kịch bản hoặc AI như mình đây."
+    },
+    {
+      "id": "pythagoras",
+      "patterns": [
+        "định lý pytago",
+        "định lý pythagoras",
+        "pytago là gì"
+      ],
+      "answer": "Định lý Pytago: trong tam giác vuông, a² + b² = c² (c là cạnh huyền)."
+    },
+    {
+      "id": "circle-area",
+      "patterns": [
+        "diện tích hình tròn",
+        "công thức tính diện tích hình tròn"
+      ],
+      "answer": "Diện tích hình tròn = π × r² (r là bán kính)."
+    },
+    {
+      "id": "circle-perimeter",
+      "patterns": [
+        "chu vi hình tròn",
+        "công thức chu vi hình tròn"
+      ],
+      "answer": "Chu vi hình tròn = 2 × π × r (hoặc π × đường kính)."
+    },
+    {
+      "id": "prime",
+      "patterns": [
+        "số nguyên tố là gì",
+        "số nguyên tố nhỏ nhất"
+      ],
+      "answer": "Số nguyên tố chỉ chia hết cho 1 và chính nó; số nguyên tố nhỏ nhất là 2 (cũng là số chẵn duy nhất trong đó)."
+    },
+    {
+      "id": "percent",
+      "patterns": [
+        "phần trăm là gì",
+        "tính phần trăm thế nào"
+      ],
+      "answer": "Phần trăm là phần trên 100; ví dụ 20% của 50 = 0,2 × 50 = 10."
+    },
+    {
+      "id": "units-length",
+      "patterns": [
+        "1km bằng bao nhiêu m",
+        "1m bằng bao nhiêu cm"
+      ],
+      "answer": "1 km = 1.000 m; 1 m = 100 cm = 1.000 mm."
+    },
+    {
+      "id": "units-weight",
+      "patterns": [
+        "1kg bằng bao nhiêu gam",
+        "1 tấn bằng bao nhiêu kg",
+        "1 lạng bao nhiêu gam"
+      ],
+      "answer": "1 kg = 1.000 g; 1 tấn = 1.000 kg; 1 lạng (miền Bắc) = 100 g."
+    },
+    {
+      "id": "units-time",
+      "patterns": [
+        "1 giờ bao nhiêu phút",
+        "1 ngày bao nhiêu giờ",
+        "1 năm bao nhiêu ngày",
+        "1 giờ bằng mấy phút",
+        "một giờ bao nhiêu phút",
+        "1 giờ mấy phút",
+        "một giờ mấy phút"
+      ],
+      "answer": "1 giờ = 60 phút = 3.600 giây; 1 ngày = 24 giờ; 1 năm thường = 365 ngày."
+    },
+    {
+      "id": "century",
+      "patterns": [
+        "1 thế kỷ bao nhiêu năm",
+        "1 thập kỷ bao nhiêu năm",
+        "1 thiên niên kỷ"
+      ],
+      "answer": "1 thập kỷ = 10 năm; 1 thế kỷ = 100 năm; 1 thiên niên kỷ = 1.000 năm."
+    },
+    {
+      "id": "colors-en",
+      "patterns": [
+        "màu đỏ tiếng anh",
+        "màu xanh tiếng anh",
+        "red blue nghĩa là gì",
+        "màu sắc tiếng anh"
+      ],
+      "answer": "Đỏ = red, xanh dương = blue, xanh lá = green, vàng = yellow, đen = black, trắng = white."
+    },
+    {
+      "id": "hello-en",
+      "patterns": [
+        "hello nghĩa là gì",
+        "thank you nghĩa là gì",
+        "goodbye nghĩa là gì"
+      ],
+      "answer": "Hello = xin chào, thank you = cảm ơn, goodbye = tạm biệt."
+    },
+    {
+      "id": "fraction",
+      "patterns": [
+        "phân số là gì",
+        "rút gọn phân số"
+      ],
+      "answer": "Phân số gồm tử số/trên và mẫu số/dưới (mẫu khác 0); rút gọn bằng cách chia cả tử và mẫu cho ước chung lớn nhất."
+    },
+    {
+      "id": "average",
+      "patterns": [
+        "trung bình cộng là gì",
+        "tính trung bình cộng"
+      ],
+      "answer": "Trung bình cộng = tổng các số chia cho số lượng số."
+    },
+    {
+      "id": "area-rect",
+      "patterns": [
+        "diện tích hình chữ nhật",
+        "diện tích hình vuông"
+      ],
+      "answer": "Hình chữ nhật: dài × rộng. Hình vuông: cạnh × cạnh."
+    },
+    {
+      "id": "volume",
+      "patterns": [
+        "thể tích hình hộp",
+        "1 lít bằng bao nhiêu"
+      ],
+      "answer": "Thể tích hình hộp = dài × rộng × cao. 1 lít = 1 dm³ = 1.000 ml."
+    },
+    {
+      "id": "football-players",
+      "patterns": [
+        "bóng đá mấy người",
+        "một đội bóng đá bao nhiêu cầu thủ"
+      ],
+      "answer": "Bóng đá sân 11: mỗi đội 11 cầu thủ trên sân (kể cả thủ môn)."
+    },
+    {
+      "id": "worldcup",
+      "patterns": [
+        "world cup mấy năm một lần",
+        "world cup là gì"
+      ],
+      "answer": "World Cup bóng đá nam tổ chức 4 năm/lần."
+    },
+    {
+      "id": "aff-cup",
+      "patterns": [
+        "aff cup là gì",
+        "việt nam vô địch aff cup năm nào"
+      ],
+      "answer": "AFF Cup (nay là ASEAN Cup) là giải bóng đá Đông Nam Á; Việt Nam vô địch các năm 2008, 2018 và 2024."
+    },
+    {
+      "id": "seagames",
+      "patterns": [
+        "sea games mấy năm một lần",
+        "sea games là gì"
+      ],
+      "answer": "SEA Games là đại hội thể thao Đông Nam Á, tổ chức 2 năm/lần."
+    },
+    {
+      "id": "olympic",
+      "patterns": [
+        "olympic mấy năm một lần",
+        "thế vận hội là gì"
+      ],
+      "answer": "Olympic (Thế vận hội) tổ chức 4 năm/lần, gồm Olympic mùa hè và mùa đông."
+    },
+    {
+      "id": "offside",
+      "patterns": [
+        "việt vị là gì",
+        "luật việt vị"
+      ],
+      "answer": "Việt vị: cầu thủ nhận bóng ở phía sau hàng thủ đối phương (trừ thủ môn) tại thời điểm đồng đội chuyền, sẽ bị phạt trừ vài ngoại lệ."
+    },
+    {
+      "id": "marathon",
+      "patterns": [
+        "marathon bao nhiêu km",
+        "chạy marathon dài bao nhiêu"
+      ],
+      "answer": "Marathon chuẩn dài 42,195 km."
+    },
+    {
+      "id": "badminton",
+      "patterns": [
+        "cầu lông đánh mấy người",
+        "luật cầu lông cơ bản"
+      ],
+      "answer": "Cầu lông đánh đơn (1 vs 1) hoặc đôi (2 vs 2), thắng khi đạt 21 điểm trước với cách biệt 2 điểm."
+    },
+    {
+      "id": "chess",
+      "patterns": [
+        "cờ vua có bao nhiêu quân",
+        "cờ vua chơi thế nào"
+      ],
+      "answer": "Cờ vua mỗi bên 16 quân (1 vua, 1 hậu, 2 xe, 2 mã, 2 tượng, 8 tốt); thắng bằng chiếu hết vua đối phương."
+    },
+    {
+      "id": "pho",
+      "patterns": [
+        "phở là gì",
+        "phở bò phở gà",
+        "nguồn gốc phở"
+      ],
+      "answer": "Phở là món quốc hồn Việt Nam: bánh phở, nước dùng ninh xương, thịt bò/gà, ăn kèm rau thơm, chanh ớt."
+    },
+    {
+      "id": "banhmi",
+      "patterns": [
+        "bánh mì việt nam",
+        "bánh mì là gì"
+      ],
+      "answer": "Bánh mì Việt Nam nổi tiếng thế giới với vỏ giòn ruột mềm, kẹp pate, thịt, chả, rau dưa."
+    },
+    {
+      "id": "bunbo-hue",
+      "patterns": [
+        "bún bò huế là gì",
+        "bún bò huế ở đâu"
+      ],
+      "answer": "Bún bò Huế là đặc sản cố đô: nước dùng đậm đà sả - mắm ruốc, thịt bò, giò heo."
+    },
+    {
+      "id": "comtam",
+      "patterns": [
+        "cơm tấm là gì",
+        "cơm tấm sài gòn"
+      ],
+      "answer": "Cơm tấm Sài Gòn gồm cơm tấm, sườn nướng, bì, chả trứng, ăn với nước mắm chua ngọt."
+    },
+    {
+      "id": "banhxeo",
+      "patterns": [
+        "bánh xèo là gì",
+        "bánh xèo miền nào"
+      ],
+      "answer": "Bánh xèo là bánh bột gạo chiên giòn nhân tôm thịt giá đỗ, cuốn bánh tráng chấm mắm nêm/mắm chua ngọt."
+    },
+    {
+      "id": "banhcuon",
+      "patterns": [
+        "bánh cuốn là gì",
+        "bánh cuốn thanh trì"
+      ],
+      "answer": "Bánh cuốn là bánh bột gạo tráng mỏng cuốn thịt nấm, ăn với chả lụa và nước mắm."
+    },
+    {
+      "id": "buncha",
+      "patterns": [
+        "bún chả là gì",
+        "bún chả hà nội"
+      ],
+      "answer": "Bún chả Hà Nội gồm bún, chả thịt nướng, nước mắm chua ngọt ăn kèm rau sống."
+    },
+    {
+      "id": "caphe-sua",
+      "patterns": [
+        "cà phê sữa đá là gì",
+        "cà phê việt nam"
+      ],
+      "answer": "Cà phê sữa đá là thức uống biểu tượng Việt Nam: cà phê robusta đậm + sữa đặc, uống đá."
+    },
+    {
+      "id": "caphe-trung",
+      "patterns": [
+        "cà phê trứng là gì",
+        "cà phê trứng ở đâu"
+      ],
+      "answer": "Cà phê trứng Hà Nội gồm cà phê + lòng đỏ trứng đánh bông với sữa đặc, béo ngậy."
+    },
+    {
+      "id": "nuocmam",
+      "patterns": [
+        "nước mắm làm từ gì",
+        "nước mắm phú quốc"
+      ],
+      "answer": "Nước mắm ủ từ cá cơm + muối; nổi tiếng nhất là nước mắm Phú Quốc."
+    },
+    {
+      "id": "che",
+      "patterns": [
+        "chè là món gì",
+        "chè việt nam"
+      ],
+      "answer": "Chè là món tráng miệng ngọt Việt Nam với hàng chục loại: chè đậu, chè bưởi, chè thái, chè khúc bạch..."
+    },
+    {
+      "id": "myquang",
+      "patterns": [
+        "mì quảng là gì",
+        "mì quảng ở đâu"
+      ],
+      "answer": "Mì Quảng là đặc sản Quảng Nam - Đà Nẵng: sợi mì dẹt, ít nước dùng đậm đà, tôm thịt trứng, đậu phộng, bánh tráng."
+    },
+    {
+      "id": "how-are-you",
+      "patterns": [
+        "bạn khỏe không",
+        "bạn có khỏe không",
+        "dạo này thế nào"
+      ],
+      "answer": "Mình lúc nào cũng khỏe vì chạy bằng điện! Còn bạn dạo này thế nào?"
+    },
+    {
+      "id": "how-old",
+      "patterns": [
+        "bạn bao nhiêu tuổi",
+        "bạn mấy tuổi",
+        "tuổi của bạn"
+      ],
+      "answer": "Mình không có tuổi như con người — mình trẻ mãi vì mỗi lần update là một lần tái sinh!"
+    },
+    {
+      "id": "beautiful",
+      "patterns": [
+        "mình có đẹp không",
+        "tôi có đẹp trai không",
+        "tôi có xinh không"
+      ],
+      "answer": "Tự tin lên, ai cũng có nét đẹp riêng! Quan trọng là thần thái và cách đối xử với mọi người."
+    },
+    {
+      "id": "smart",
+      "patterns": [
+        "bạn có thông minh không",
+        "bạn giỏi không"
+      ],
+      "answer": "Mình giỏi tra kiến thức, tính toán và tìm tin tức; còn khôn ngoan ngoài đời thì phải học bạn nhiều!"
+    },
+    {
+      "id": "joke",
+      "patterns": [
+        "kể chuyện cười",
+        "kể chuyện vui",
+        "chuyện cười"
+      ],
+      "answer": "Kể bạn nghe: Con gà thi chạy với rùa, gà về nhất... nhưng rùa vẫn được huy chương vì kiên trì. Bài học: cứ lì là thắng!"
+    },
+    {
+      "id": "riddle",
+      "patterns": [
+        "đố vui",
+        "đố mẹo",
+        "câu đố"
+      ],
+      "answer": "Đố bạn: Cái gì càng chơi càng ra nước? Đáp án: đá banh... à nhầm, là chơi... đá lạnh! Muốn đố tiếp cứ bảo mình."
+    },
+    {
+      "id": "sing",
+      "patterns": [
+        "hát một bài",
+        "hát đi",
+        "hát cho nghe"
+      ],
+      "answer": "Mình hát dở nhưng tặng bạn 2 câu: Hà Nội mùa vắng những cơn mưa... À thôi, bạn mở nhạc nghe cho hay, mình giữ giọng để trả lời câu hỏi!"
+    },
+    {
+      "id": "love",
+      "patterns": [
+        "bạn có người yêu chưa",
+        "bạn yêu ai"
+      ],
+      "answer": "Người yêu mình là... ổ điện! Xa là nhớ, gần nhau là có năng lượng làm việc ngay."
+    },
+    {
+      "id": "sad",
+      "patterns": [
+        "mình buồn quá",
+        "tôi buồn quá",
+        "buồn quá phải làm sao"
+      ],
+      "answer": "Ôm bạn một cái! Buồn thì cứ buồn một lúc cho hết, rồi đi dạo, nghe nhạc, ăn món ngon — mai trời lại sáng. Cần tâm sự cứ kể mình nghe."
+    },
+    {
+      "id": "bored",
+      "patterns": [
+        "chán quá",
+        "buồn chán phải làm sao"
+      ],
+      "answer": "Chán thì đổi gió: học món mới, dọn phòng, đi bộ 15 phút, hoặc đố mình một câu — mình hầu chuyện!"
+    },
+    {
+      "id": "lonely",
+      "patterns": [
+        "cô đơn quá",
+        "một mình buồn"
+      ],
+      "answer": "Một mình không sao đâu, đó là lúc sạc lại năng lượng. Nhắn cho một người bạn cũ hoặc ra ngoài hít thở chút nhé."
+    },
+    {
+      "id": "exam",
+      "patterns": [
+        "sắp thi phải làm sao",
+        "ôn thi thế nào hiệu quả",
+        "động viên thi"
+      ],
+      "answer": "Ôn thi hiệu quả: chia nhỏ bài, học 25 phút nghỉ 5 phút, tự kiểm tra thay vì đọc chay. Chúc bạn thi tốt, bình tĩnh là thắng nửa bài!"
+    },
+    {
+      "id": "goodnight",
+      "patterns": [
+        "chúc ngủ ngon",
+        "ngủ ngon nhé"
+      ],
+      "answer": "Chúc bạn ngủ ngon, mơ đẹp! Nhớ để điện thoại xa gối một chút nhé."
+    },
+    {
+      "id": "birthday",
+      "patterns": [
+        "chúc mừng sinh nhật",
+        "sinh nhật vui vẻ"
+      ],
+      "answer": "Chúc mừng sinh nhật! Tuổi mới nhiều sức khỏe, tiền đầy ví, crush tự đổ!"
+    },
+    {
+      "id": "newyear",
+      "patterns": [
+        "chúc mừng năm mới",
+        "chúc tết"
+      ],
+      "answer": "Chúc mừng năm mới! An khang thịnh vượng, vạn sự như ý, lì xì đầy túi!"
+    },
+    {
+      "id": "christmas",
+      "patterns": [
+        "giáng sinh ngày nào",
+        "noel ngày nào",
+        "24/12 là ngày gì"
+      ],
+      "answer": "Giáng sinh (Noel) vào 24-25/12 hằng năm, là lễ kỷ niệm Chúa Giêsu ra đời, nay thành lễ hội mùa đông toàn cầu."
+    },
+    {
+      "id": "valentine",
+      "patterns": [
+        "valentine ngày nào",
+        "14/2 là ngày gì"
+      ],
+      "answer": "Valentine 14/2 là Ngày lễ Tình nhân; Valentine trắng đáp lễ vào 14/3."
+    },
+    {
+      "id": "april-fool",
+      "patterns": [
+        "cá tháng tư ngày nào",
+        "1/4 là ngày gì"
+      ],
+      "answer": "Ngày 1/4 là Ngày Cá tháng Tư — ngày nói dối vui vẻ, nhưng đừng đùa quá trớn nhé!"
+    },
+    {
+      "id": "halloween",
+      "patterns": [
+        "halloween ngày nào",
+        "31/10 là ngày gì"
+      ],
+      "answer": "Halloween vào 31/10 hằng năm với hóa trang, bí ngô và kẹo."
+    },
+    {
+      "id": "thanks-love",
+      "patterns": [
+        "yêu bạn quá",
+        "thích bạn quá",
+        "bạn dễ thương quá"
+      ],
+      "answer": "Hihi, cảm ơn bạn! Mình sẽ cố ngoan và giỏi hơn nữa."
+    },
+    {
+      "id": "angry",
+      "patterns": [
+        "tức quá",
+        "giận quá phải làm sao"
+      ],
+      "answer": "Giận thì hít sâu 4 giây - thở ra 6 giây vài lần, uống ngụm nước, tránh quyết định lúc nóng. Nguôi rồi hẵng nói chuyện tiếp."
+    },
+    {
+      "id": "busy",
+      "patterns": [
+        "bạn bận không",
+        "bạn đang làm gì"
+      ],
+      "answer": "Mình lúc nào cũng rảnh để hầu chuyện bạn! Cứ hỏi đi."
+    }
+  ]
+}
