@@ -5,6 +5,7 @@ const nct = require('./nhaccuatui-api');
 const troll = require('./troll');
 const aichat = require('./aichat');
 const aliasMod = require('./alias');
+const listadminCanvas = require('./listadmin-canvas.cjs');
 const axios = require('axios');
 const tuluyen = require('./tuluyen/index.cjs');
 const fs = require('fs');
@@ -80,12 +81,16 @@ client.on('messageCreate', async (message) => {
 
   const prefix = data.prefix;
 
+  // Ping prefix / tag bot: tra loi y nhu bot2 (prefix.js)
+  const prefixInfoMsg = () =>
+    `Dạ prefix hiện tại của bé nè anh ơi! 🥺💖\nPrefix: ${prefix}\nAnh gõ ${prefix}help để xem bé có những lệnh gì nha! 🐰✨`;
+
   if (message.mentions.has(client.user) && (message.content.trim() === `<@${client.user.id}>` || message.content.trim() === `<@!${client.user.id}>`)) {
-    return message.reply(`👋 Prefix hiện tại: \`${prefix}\` — Gõ \`${prefix}help\` để xem danh sách lệnh.`);
+    return message.reply(prefixInfoMsg());
   }
 
   if (message.content.trim().toLowerCase() === 'prefix') {
-    return message.reply(`Prefix hiện tại: \`${prefix}\``);
+    return message.reply(prefixInfoMsg());
   }
 
   const repliedSearch = searches.get(message.author.id);
@@ -180,6 +185,7 @@ client.on('messageCreate', async (message) => {
 
   if ((message.content || '').trim() === prefix) {
     try { await tuluyen.handlePrefixSpam(message); } catch {}
+    return message.reply(prefixInfoMsg());
   }
 
   const parsed = parseCommand(message.content, prefix);
@@ -248,33 +254,56 @@ client.on('messageCreate', async (message) => {
     if (!isQtv(message.author.id)) {
       return message.reply('Bạn hong có quyền!');
     }
-    if (data.qtv.length === 0) return message.reply('Chưa có admin nào!');
-    const lines = await Promise.all(data.qtv.map(async (id) => {
+    if (data.qtv.length === 0) return message.reply('Không tìm thấy thông tin quản trị viên nào !');
+    const sangTheId = data.sangThe ? String(data.sangThe) : String(data.qtv[0]);
+    const adminList = [];
+    for (const id of data.qtv) {
       try {
         const user = await client.users.fetch(id);
-        return `• **${user.tag}** ${id === data.qtv[0] ? '👑 Đấng Sáng Thế' : '🛡️ QTV'}`;
+        adminList.push({
+          uid: id,
+          name: user.globalName || user.tag,
+          avatar: user.displayAvatarURL({ extension: 'png', size: 128 }),
+          role: String(id) === sangTheId ? 'Quản trị Tối cao' : 'Quản trị Cấp cao',
+          keyType: String(id) === sangTheId ? 'supreme' : 'gold',
+          isHighLevel: true,
+          isSupreme: String(id) === sangTheId,
+        });
       } catch {
-        return `• \`${id}\` (không tìm thấy)`;
+        adminList.push({
+          uid: id, name: `UID ${id}`,
+          role: String(id) === sangTheId ? 'Quản trị Tối cao' : 'Quản trị Cấp cao',
+          keyType: String(id) === sangTheId ? 'supreme' : 'gold',
+          isHighLevel: true, isSupreme: String(id) === sangTheId,
+        });
       }
-    }));
-    const embed = new EmbedBuilder()
-      .setColor(0x2ECC71)
-      .setTitle('📋 Danh Sách Quản Trị')
-      .setDescription(lines.join('\n'))
-      .setFooter({ text: `Tổng: ${data.qtv.length} người` });
-    return message.reply({ embeds: [embed] });
+    }
+    let imagePath = null;
+    try {
+      imagePath = await listadminCanvas.createAdminListImage(adminList);
+      const att = new AttachmentBuilder(imagePath, { name: 'admin_list.png' });
+      await message.reply({ files: [att] });
+    } catch (e) {
+      console.error('[LISTADMIN canvas]', e.message);
+      const lines = adminList.map((a) => `• **${a.name}** ${a.isSupreme ? '👑 Đấng Sáng Thế' : '🛡️ QTV'}`);
+      await message.reply(`📋 **Danh Sách Quản Trị**\n${lines.join('\n')}`);
+    } finally {
+      if (imagePath) try { fs.unlinkSync(imagePath); } catch {}
+    }
+    return;
   }
 
   if (cmd === 'prefix') {
-    if (!args[0]) return message.reply(`Prefix hiện tại: \`${prefix}\``);
-    if (!isQtv(message.author.id)) return message.reply('Bạn hong có quyền!');
+    if (!args[0]) return message.reply(prefixInfoMsg());
+    if (!isQtv(message.author.id)) return message.reply('Huhu anh không có quyền đổi prefix của bé đâu ạ! 🥺');
     let newPrefix = args[0] === 'change' ? args[1] : args[0];
     if (!newPrefix) return message.reply('Nhập prefix mới! VD: `,prefix +`');
     if (newPrefix.startsWith('+')) newPrefix = newPrefix.slice(1);
     if (!newPrefix) return message.reply('Prefix không hợp lệ!');
+    if (newPrefix.includes(' ')) return message.reply('Huhu prefix không được có khoảng trắng đâu anh ơi! 🥺');
     data.prefix = newPrefix;
     saveData();
-    return message.reply(`Đã đổi prefix thành \`${newPrefix}\``);
+    return message.reply(`Dạ bé đổi prefix thành công rồi nè anh ơi! 💖✨\nPrefix mới: ${newPrefix} ạ!`);
   }
 
   if (['music', 'soundcloud', 'sc'].includes(cmd)) {
