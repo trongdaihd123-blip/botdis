@@ -1,1 +1,33 @@
-/root/bot/bot2/assets/json-data/data-tu-luyen-updates.json
+{
+  "updates": {
+    "2026-08-19": [
+      "cập nhật hệ thống bế quan",
+      "Thiên Tầng Tháp"
+    ],
+    "2026-08-20": [
+      "thêm đăng ký hộ chiếu tu tiên"
+    ],
+    "2026-08-21": [
+      "neft sức mạnh scaling boss tháp",
+      "tu luyện pháp tắc"
+    ],
+    "2026-08-24": [
+      "ra mắt tinh vân kiếm 50b",
+      "sửa cơ chế đan 43",
+      "neft boss tháp"
+    ],
+    "2026-08-26": [
+      "add kiếm 120b và 500b=)"
+    ],
+    "2026-09-01": [
+      "thêm upgrade đồ đốt lt chơi",
+      "có dp auto r nha ae"
+    ],
+    "2026-09-05": [
+      "thêm đạo tâm Phật Đạo"
+    ],
+    "2026-09-14": [
+      "Thêm Luân hồi và cơ chế tương tự các phim là chọn chuyển sinh và nén sức mạnh luân hồi"
+    ]
+  }
+}
