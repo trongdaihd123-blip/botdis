@@ -41,11 +41,47 @@ function isQtv(userId) {
   return data.qtv.includes(userId);
 }
 
+// Dang Sang The = sangThe, khong thi qtv[0] (giong getSangThe cua tuluyen)
+function isSangThe(userId) {
+  const st = data.sangThe ? String(data.sangThe) : (data.qtv.length ? String(data.qtv[0]) : null);
+  return !!st && String(userId) === st;
+}
+
+// ---- ANTISLEEP: 5 phut tu nhan "," vao cac box co bot (chong ngu) ----
+let antisleepTimer = null;
+async function antisleepPing() {
+  if (!data.antisleep?.on) return;
+  for (const guild of client.guilds.cache.values()) {
+    let channels = [];
+    try {
+      const fetched = await guild.channels.fetch();
+      channels = [...fetched.values()];
+    } catch { continue; }
+    for (const ch of channels) {
+      try {
+        if (!ch?.isTextBased || ch.isDMBased?.()) continue;
+        const me = guild.members.me;
+        if (me && ch.permissionsFor && !ch.permissionsFor(me).has('SendMessages')) continue;
+        const sent = await ch.send(',');
+        setTimeout(() => { sent.delete().catch(() => {}); }, 10000);
+        await new Promise((r) => setTimeout(r, 1500));
+      } catch {}
+    }
+  }
+}
+function antisleepStart() {
+  antisleepStop();
+  antisleepTimer = setInterval(() => { antisleepPing().catch(() => {}); }, 5 * 60 * 1000);
+}
+function antisleepStop() {
+  if (antisleepTimer) { clearInterval(antisleepTimer); antisleepTimer = null; }
+}
+
 // Danh sach lenh goc (de validate ,alias add) — dong bo voi cac module + core
 const KNOWN_COMMANDS = [
   'setup', 'set', 'add', 'remove', 'listadmin', 'list-qtv', 'admin',
   'prefix', 'music', 'soundcloud', 'sc', 'nhaccuatui', 'nct',
-  'cmd', 'help', 'commands', 'del', 'restart', 'alias',
+  'cmd', 'help', 'commands', 'del', 'restart', 'alias', 'antisleep',
   'tu', 'tu-luyen', 'tl', 'dp', 'tt', 'thong-tin', 'bxh', 'bang-xep-hang',
   'shop', 'pk', 'mua', 'dung', 'su-kien', 'tham-hiem', 'explore',
   'be-quan', 'bq', 'seclude',
@@ -444,7 +480,8 @@ client.on('messageCreate', async (message) => {
           `\`${prefix}alias add <tên> <lệnh>\` / \`${prefix}alias del <tên>\` / \`${prefix}alias list\` — Alias riêng\n` +
           `\`${prefix}listadmin\` — DS admin • \`${prefix}restart\` • \`${prefix}prefix <new>\`\n` +
           `**QTV:** \`${prefix}tl set +stt @user <số>\` • \`${prefix}tl update <nội dung>\` • \`${prefix}tl check buff|bank @user\`\n` +
-          `**Đấng sáng thế:** thêm \`${prefix}tl banacc/unban @user\` • \`${prefix}tl thap reset\`` },
+          `**Đấng sáng thế:** thêm \`${prefix}tl banacc/unban @user\` • \`${prefix}tl thap reset\`\n` +
+          `\`${prefix}antisleep on/off\` — Tự nhắn \`,\` mỗi 5p chống ngủ (Đấng)` },
       )
       .setFooter({ text: `${prefix}tl help — hướng dẫn đầy đủ kèm mẹo tu luyện` });
     return message.reply({ embeds: [embed] });
@@ -459,6 +496,26 @@ client.on('messageCreate', async (message) => {
     } catch {
       return message.reply('Không thể xóa tin nhắn này!');
     }
+  }
+
+  if (cmd === 'antisleep') {
+    if (!isSangThe(message.author.id)) return message.reply('❌ Chỉ Đấng Sáng Thế mới dùng được lệnh này!');
+    const sub = (args[0] || '').toLowerCase();
+    if (sub === 'on') {
+      data.antisleep = { on: true };
+      saveData();
+      antisleepStart();
+      antisleepPing().catch(() => {});
+      return message.reply('✅ **Antisleep đã BẬT** — mỗi 5 phút bot tự nhắn `,` vào các box rồi xóa sau 10s.');
+    }
+    if (sub === 'off') {
+      data.antisleep = { on: false };
+      saveData();
+      antisleepStop();
+      return message.reply('✅ **Antisleep đã TẮT**.');
+    }
+    const st = data.antisleep?.on ? 'BẬT 🟢' : 'TẮT 🔴';
+    return message.reply(`Antisleep hiện: **${st}**\nDùng \`${prefix}antisleep on/off\` (chỉ Đấng Sáng Thế).`);
   }
 
   if (cmd === 'restart') {
@@ -515,6 +572,10 @@ client.once('ready', () => {
   console.log(`Prefix hiện tại: ${data.prefix}`);
   console.log(`Setup: ${data.setupDone ? 'Đã setup' : 'Chưa setup'}`);
   console.log(`Số qtv: ${data.qtv.length}`);
+  if (data.antisleep?.on) {
+    console.log('[ANTISLEEP] Dang BAT tu data cu — khoi dong loop 5 phut');
+    antisleepStart();
+  }
   tuluyen.init(client, {
     getPrefix: () => data.prefix,
     getAdmins: () => data.qtv.map(String),
